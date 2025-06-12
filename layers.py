@@ -10,17 +10,17 @@ class Layer:
     def forward(self, input):
         pass
 
-    def backward(self):
+    def backward(self, grad_output):
         pass
 
 
 '''
 1. Input: image array of shape (400,640,1)
-2. First Convolutional layer: filter (3,3), number of kernels = 8, padding = 0
+2. First Convolutional layer: filter (3,3), number of kernels = 8, padding = 0, stride = 1
     output_height = input_height - filter + 1
     output_width = input_width - filter + 1
     kernels (8,3,3,1)
-    output (398,638,n), where n = number of filters (kernels) => (398,638,8)
+    output (398,638,n), where n = number of filters/kernels => (398,638,8)
 3. ReLu Activation f(x) = max(0,x)
 4. Pooling (MaxPooling), stride = 2, size 2x2, output => (199,319,8)
 5. Repeat 2-4 (second Convolution), input (199,319,8), number of kernels = 16 => (197,317,16), Relu => (197,317,16), Pooling => (98,158,16)
@@ -33,27 +33,28 @@ class Conv:
         self.num_filters = num_filters
         self.filter_size = filter_size
         self.input_channels = input_channels
-        self.kernels = np.random.randn(num_filters, filter_size, filter_size, input_channels) * 0.1    # initialization of n filters (kernels), array filter_sizexfilter_size with random values from normal distribution scales down by /10, (num_filters, height, width, input_channels), for grayscale the input_channels = 1
+        self.kernels = np.random.randn(num_filters, filter_size, filter_size, input_channels) * 0.1    # initialization of n filters (kernels), array of shape (num_filters, filter_size, filter_size, input_channels) with random values from normal distribution scales down by /10, (num_filters, height, width, input_channels), for grayscale the input_channels = 1
         print('Convolutional layer initialized.')
 
-    # return a one piece (slice) of array indicated by filter at a time, h - row idx, w - column idx
+    # return a one piece (slice) of input array indicated by filter at a time, h - row idx, w - column idx
     def image_region(self, input):
         self.input = input
         batch_size, height, width, channels = input.shape
         f = self.filter_size
 
-        # height and width of output array
+        # height and width of output array, last common is the end of output array
         out_height = height - f + 1
         out_width = width - f + 1
 
-        for n in range(batch_size):
-            for h in range(out_height):
-                for w in range(out_width):
-                    patch = input[n, h:(h + f), w:(w + f), :]    # patch shape (f, f, num_filters)
+        for n in range(batch_size):    # loop through batch samples
+            for h in range(out_height):    # loop through its rows (height)
+                for w in range(out_width):    # loop through its columns (width)
+                    patch = input[n, h:(h + f), w:(w + f), :]    # patch shape (f, f, channels) for image n in batch_size
                     yield patch, n, h, w    # return and pause
 
+    # return the output array (feature map) of shape (batch_size, out_height, out_width, num_filters) where all elements from image_region() are multipled by kernel and summed
     def forward(self, input):
-        self.input = input    # input array of input, shape (inp_height, inp_width, 1)
+        self.input = input  
         batch_size, height, width, channels = input.shape
         num_filters = self.num_filters
         f = self.filter_size
@@ -62,11 +63,12 @@ class Conv:
         out_height = height - f + 1
         out_width = width - f + 1
 
-        # shape of output array
+        # shape of output array filled by 0
         conv_out = np.zeros((batch_size, out_height, out_width, num_filters))
 
+        # output array filled by sum of the multiplication between each input patch and each filter (kernel), searching the patterns
         for patch, n, h, w in self.image_region(input):
-            conv_out[n, h, w, :] = np.sum(patch * self.kernels, axis = (1,2,3))
+            conv_out[n, h, w, :] = np.sum(patch * self.kernels, axis = (1,2,3))    # 4D array filled by 1D output (one pixel/feature in image for every filters)
 
         print(f'Image patch shape: {patch.shape}')
         print(f'Filters shape: {self.kernels.shape}')
@@ -75,18 +77,16 @@ class Conv:
         return conv_out
 
     def backward(self, grad_output, learning_rate):
-        input = self.input
+        input = self.input    # from forward
         batch_size, height, width, channels = input.shape
         f = self.filter_size
         num_filters = self.num_filters
-
-        # Output shape
-        out_height = height - f + 1
-        out_width = width - f + 1
         
+        # arrays shape for kernels and conv gradients 
         grad_conv = np.zeros(input.shape)
-        grad_kernels = np.zeros_like(self.kernels)
+        grad_kernels = np.zeros(self.kernels.shape)
 
+        # loop through patch, where n is the idx of image, h - row idx, w - column idx, update grad of every filter (kernel)
         for patch, n, h, w in self.image_region(input):
             for k in range(num_filters):
                 grad_kernels[k] += patch * grad_output[n, h, w, k]    # patch shape (f, f, channels), kernels change
@@ -233,7 +233,7 @@ class FullyConnected:
 
         1. dl/dw = dy_pred/dw * dl/dy_pred
             dy_ped/dw = x
-            dl/dy_pred = 1/n * ∑(y_pred^2 - 2*y_pred*y + y^2)   =>   dl/dy_pred = 1/n * ∑(2*y_pred - 2*y)   => 2/n * ∑(y_pred - y) - ∑grad
+            dl/dy_pred = 1/n * ∑(y_pred^2 - 2*y_pred*y + y^2)   =>   dl/dy_pred = 1/n * ∑(2*y_pred - 2*y)   =>   2/n * ∑(y_pred - y) - ∑grad
             
             dl/dw = x * 2/n * ∑(y_pred - y)   =>   x * ∑grad
 
