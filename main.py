@@ -1,26 +1,29 @@
 import data_preparation as dp
-import layers
-
-
-def main():
-    # all_data = dp.data_list("./data/photos/")
-    # new_width = 640
-    # new_height = 400
-    # all_data_resized = dp.img_set_size(all_data, new_width, new_height)
-    # all_data_processed = dp.data_list_processed(all_data_resized)
-    # X, Y = dp.learning_data_input_info(all_data_processed)
-    # X_train, Y_train, X_test, Y_test, X_validation, Y_validation = dp.data_split(X, Y)
-
-    # print(f'X_train.shape: {X_train[0].shape}')
-
-    pass
-
-
-
-
-
-
+from layers import Conv, ReLU, MaxPool, Flatten, Dense, MSELoss
+import model
+import numpy as np
+import os
+ 
 
 if __name__ == "__main__":
-    main()
-    pass
+    X_train, Y_train, X_test, Y_test, X_val, Y_val = dp.load_data()
+
+    X = X_train[0:3]
+    y_original = Y_train[0:3]
+
+    # Initialize the CNN model    
+    model = model.CNN()
+
+    # Add layers to model
+    model.add_layer(Conv(8, 3, 1))
+    model.add_layer(ReLU())
+    model.add_layer(MaxPool(2))
+    model.add_layer(Conv(16, 3, 8))
+    model.add_layer(ReLU())
+    model.add_layer(MaxPool(2))
+    model.add_layer(Flatten())
+    model.add_layer(Dense(247744, 4))
+
+    model.print_model_structure()
+    
+    loss_fn = MSELoss()

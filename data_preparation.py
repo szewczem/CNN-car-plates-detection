@@ -12,7 +12,7 @@ from PIL import Image
 # LOADING DATA TO CSV
 # writing the plates location from .xml to .csv ('name', 'x_top_left', 'y_top_left', 'x_bottom_right', 'y_bottom_right')
 def write_to_csv(plates):
-    csvfile = open('csv_plates.csv', 'w', newline='')
+    csvfile = open('./data/original/csv_plates.csv', 'w', newline='')
     fieldnames = ['name', 'xtl', 'ytl', 'xbr', 'ybr', 'img_width', 'img_height']
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
     writer.writeheader()
@@ -29,10 +29,6 @@ def write_to_csv(plates):
 
         writer.writerow({'name': name, 'xtl': xtl, 'ytl': ytl, 'xbr': xbr, 'ybr': ybr, 'img_width': img_width, 'img_height': img_height})
 
-xml = parse('./data/annotations.xml')
-plates = xml.getElementsByTagName('image')
-# write_to_csv_normalized(plates)
-# write_to_csv(plates)
 
 # Create the list of dict [{'X: path, 'Y': xtl, ytl, xbr, ybr, width, height}]
 def data_list(data_img_path):
@@ -43,7 +39,7 @@ def data_list(data_img_path):
     for img in images:
         img_path = os.path.join(data_img_path, img)
 
-        with open('csv_plates.csv') as file:
+        with open('./data/original/csv_plates.csv') as file:
             reader_file = csv.reader(file)
             for row in reader_file:
                 if row[0] == img:
@@ -79,6 +75,7 @@ def img_set_size(all_data, new_width, new_height):
 
     return all_data_resized
 
+
 # Image to grayscale, shuffle final list, output [{'X': img_array(for grayscale), 'Y': xtl_norm, ytl_norm, xbr_norm, ybr_norm}]
 def data_list_processed(all_data_resized):
     all_data_processed = []
@@ -91,6 +88,7 @@ def data_list_processed(all_data_resized):
     random.seed(42)
     random.shuffle(all_data_processed)
     return all_data_processed
+
 
 # Prepare the data list for CNN input, output X = [img_array(for grayscale)], Y = [xtl_norm, ytl_norm, xbr_norm, ybr_norm]
 def normalize_data_input(all_data_processed):
@@ -136,6 +134,64 @@ def data_split(X, Y, original_size):
     return X_train, Y_train, X_test, Y_test, X_val, Y_val, original_train, original_test, original_val
 
 
+def save_prepared_data(new_width, new_height):
+    print("Starting data preprocesing...")
+
+    # XML to CSV
+    xml = parse('./data/original/annotations.xml')
+    plates = xml.getElementsByTagName('image')
+    write_to_csv(plates)
+
+    # CSV to data list
+    all_data = data_list("./data/original/photos/")
+
+    # Resize and normalize bbox
+    all_data_resized = img_set_size(all_data, new_width, new_height)
+
+    # Convert to garyscale and shuffle
+    all_data_processed = data_list_processed(all_data_resized)
+
+    # prepare input for CNN
+    X, Y, original_size = normalize_data_input(all_data_processed)
+
+    # Split for training, test and valid dataset
+    X_train, Y_train, X_test, Y_test, X_val, Y_val, orig_train, orig_test, orig_val = data_split(X, Y, original_size)
+
+    # save prepared stets
+    # training set
+    np.save('./data/processed/X_train.npy', X_train)
+    np.save('./data/processed/y_train.npy', Y_train)
+    
+    # test set
+    np.save('./data/processed/X_test.npy', X_test)
+    np.save('./data/processed/y_test.npy', Y_test)
+
+    # validation set
+    np.save('./data/processed/X_val.npy', X_val)
+    np.save('./data/processed/Y_val.npy', Y_val)
+
+    print("Data preparation and saving complete.")
+
+
+def load_prepared_data():
+    X_train = np.load('./data/processed/X_train.npy')
+    Y_train = np.load('./data/processed/Y_train.npy')
+    X_test = np.load('./data/processed/X_test.npy')
+    Y_test = np.load('./data/processed/Y_test.npy')
+    X_val = np.load('./data/processed/X_val.npy')
+    Y_val = np.load('./data/processed/Y_val.npy')
+    print("Data loaded.")
+    return X_train, Y_train, X_test, Y_test, X_val, Y_val
+
+
+def load_data():
+    if not os.path.exists('./data/processed/X_train.npy'):
+        save_prepared_data(640, 400)
+        return load_prepared_data()
+    else:
+        return load_prepared_data()
+
+
 def output_array_tolist(predicted_array):
     predicted_values = predicted_array.flatten().tolist()
     return predicted_values
@@ -152,13 +208,6 @@ def rescale_bbox(predicted_values, original_size):
     ybr = ybr_n * img_height
 
     return [xtl, ytl, xbr, ybr]
-
-
-def batch_generator(X, Y, batch_size):
-    total_samples = X.shape[0]
-    for i in range(0, total_samples, batch_size):
-        end_idx = min(i + batch_size, total_samples)
-        yield X[i:end_idx], Y[i:end_idx]
 
 
 # PLOTS

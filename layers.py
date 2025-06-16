@@ -5,32 +5,38 @@ import data_preparation as dp
 
 class Layer:
     def __init__(self):
-        print('Layer initialized.')
-    
+        pass
+
+    def __repr__(self):
+        return self.__class__.__name__
+
     def forward(self, input):
         pass
 
-    def backward(self, grad_output):
+    def backward(self, grad_output, learning_rate):
         pass
 
 '''
-1. Input: image array of shape (400,640,1)
-2. First Convolutional layer: filter (3,3), number of kernels = 8, padding = 0, stride = 1
+Structure of CNN:
+1. Input: image - array of shape (400, 640, 1)
+2. First Convolutional layer: filter (3, 3, 1), number of kernels = 8, padding = 0, stride = 1
     output_height = input_height - filter + 1
     output_width = input_width - filter + 1
     kernels (8,3,3,1)
-    output (398,638,n), where n = number of filters/kernels => (398,638,8)
+    output (398, 638, channels), where channels is equal to number of filters (kernels) => (398, 638, 8)
 3. ReLu Activation f(x) = max(0,x)
-4. Pooling (MaxPooling), stride = 2, size 2x2, output => (199,319,8)
-5. Repeat 2-4 (second Convolution), input (199,319,8), number of kernels = 16 => (197,317,16), Relu => (197,317,16), Pooling => (98,158,16)
-6. Flattening 98*158*16 => (1, 247744)
-7. Fully Connected (hiden and dense) => (1,4)
+4. Pooling (MaxPooling), stride = 2, size 2x2, output => (199, 319, 8)
+5. Second Convolution, input (199, 319, 8), number of kernels = 16 => (197, 317, 16), 
+6. Second Relu Actibvation => (197, 317, 16), 
+7. Second MaxPooling => (98, 158, 16)
+8. Flattening 98*158*16 => (1, 247744)
+9. Fully Connected (Dense) => (1, 4)
 '''
 
 
 class Conv(Layer):
     '''
-    Convolutional layer that applies filters (kernels) to input data to detect features (edges, patterns).
+    Convolutional layer, applies filters (kernels) to input data to detect features (edges, patterns).
 
     Arguments: 
     num_filters -- int, number of filters (kernels)
@@ -42,24 +48,28 @@ class Conv(Layer):
             input -- array of shape (batch_size, height, width, channels)
             For the second or later convolutioal layers, channels number is equal to number of filters (kernels) from previous convolution.
         Returns:
-            conv_out -- array of shape (batch_size, height, width, num_filters), where num_filters is equal to provided number of kernels, the result of convolving filters over the input
+            conv_out -- array of shape (batch_size, height, width, channels), where channels is equal to provided number of kernels, the result of convolving filters over the input
 
     Backward:
         Arguments:
-            grad_output -- array of shape (batch_size, height, width, num_filters), the gradient propagated from the previous layer (ReLU)
-            learning_rate -- float, the step size used to update model parameters (kernel weights)
+            grad_output -- array of shape (batch_size, height, width, channels), the gradient propagated from the previous layer (ReLU)
+            learning_rate -- float, the step size used to update model parameters (kernel weights and biases)
         Returns:
-            grad_conv -- array of shape (batch_size, height, width, input_channels), gradient of the loss with respect to the input, the shape is corresponding to forward input            
+            grad_conv -- array of shape (batch_size, height, width, channels), gradient of the loss with respect to the input, the shape is corresponding to forward input            
     '''
 
-    def __init__(self, num_filters, filter_size, input_channels=1):
+    def __init__(self, num_filters, filter_size, channels=1):
         self.num_filters = num_filters
         self.filter_size = filter_size
-        self.input_channels = input_channels        
+        self.channels = channels        
         # initialization of n filters (kernels) with random values from normal distribution scales down by 10
-        self.kernels = np.random.randn(num_filters, filter_size, filter_size, input_channels) * 0.1
-        self.biases = np.zeros(num_filters)    # biases start at 0
-        print('Convolutional layer initialized.')
+        self.kernels = np.random.randn(num_filters, filter_size, filter_size, channels) * 0.1
+        # number of biases == num_filters, all biases start at 0
+        self.biases = np.zeros(num_filters)    
+        # print('Convolutional layer initialized.')
+
+    def __repr__(self):
+        return f"Conv(kernels={self.num_filters}, filter_size={self.filter_size}, channels={self.channels})"
 
     # return a one piece (slice) of input array indicated by filter at a time, h - row idx, w - column idx
     def image_region(self, input):
@@ -94,13 +104,18 @@ class Conv(Layer):
 
         # output array filled by sum of the multiplication between each input patch and each filter (kernel)
         for patch, n, h, w in self.image_region(input):
-            conv_out[n, h, w, :] = np.sum(patch * self.kernels, axis = (1,2,3)) + b    # 4D array filled by 1D output (one pixel/feature in image for every filters)
+            conv_out[n, h, w, :] = np.sum(patch * self.kernels, axis = (1,2,3)) + b    # 4D array filled by 1D output (one pixel/feature in image for every channels)
 
-        print(f'Image patch shape: {patch.shape}')
-        print(f'Filters shape: {self.kernels.shape}')
-        print(f'Biases shape: {b.shape}')
-        print(f'Image patch * kernel shape: {(patch * self.kernels).shape}')
-        print(f'Output shape: {conv_out.shape}')
+        # print('='*50)
+        # print(f'Input shape: {input.shape}')
+        # print('='*50)
+        # print(f'Patch shape: {patch.shape}')
+        # print(f'Kernels shape: {self.kernels.shape}')
+        # print(f'Biases shape: {b.shape}')
+        # print(f'Patch * kernel shape: {(patch * self.kernels).shape}')
+        # print('='*50)
+        # print(f'Conv output shape: {conv_out.shape}')
+        # print('='*50)        
         return conv_out
     
     # kernels rotation function, rotate over rows and columns, channel stay intact
@@ -115,13 +130,13 @@ class Conv(Layer):
         num_filters = self.num_filters
         
         # arrays shape for kernels and conv gradients 
-        grad_kernels = np.zeros(self.kernels.shape)    # array of ashape (num_filters, filter_size, filter_size, input_channels)
-        grad_conv = np.zeros(input.shape)    # array of shape (batch_size, out_height, out_width, num_filters)
+        grad_kernels = np.zeros(self.kernels.shape)    # array of ashape (num_filters, filter_size, filter_size, channels)
+        grad_conv = np.zeros(input.shape)    # array of shape (batch_size, out_height, out_width, channels) == input.shape (from forward)
         grad_biases = np.zeros(self.biases.shape)      
 
         '''
         Gradient for kernels:
-            dl/dki = ?
+            dl/dk = ?
             dk -- gradient of the cost with respect of the weights of the kernel
             z -- values from grad_output
             A -- imput array (from forward)
@@ -143,7 +158,7 @@ class Conv(Layer):
             dl/dk = [a] * [dl/dz]   =>   dl/dk = conv(A, dl/dz)   =>   grad_kernels = conv(input, grad_output)
 
         Gradient for input:
-            dl/dai = ?
+            dl/da = ?
 
             dl/da = ∑(dz/da * dl/dz)
 
@@ -202,9 +217,9 @@ class Conv(Layer):
         return grad_conv
 
 
-class ReLU:
+class ReLU(Layer):
     '''
-    ReLU activation layer that applies 0 for all values lower or equal 0 (positive keeps as-is).
+    ReLU activation layer, applies 0 for all values lower or equal 0 (positive keeps as-is).
 
     Forward:
         Arguments:
@@ -220,25 +235,34 @@ class ReLU:
     '''
 
     def __init__(self):
-        print("ReLU activation initialized.")
+        # print("ReLU Activation layer initialized.")
+        pass
+
+    def __repr__(self):
+        return f"ReLU()"
 
     def forward(self, input):
         # f(x) = max(0,x), if input <= 0 then 0
         self.input = input 
         relu_out = np.maximum(0, input)
+        # print('='*50)
+        # print(f'Input shape: {input.shape}')
+        # print('='*50)
+        # print(f'ReLU output shape: {relu_out.shape}')
+        # print('='*50) 
         return relu_out
 
-    def backward(self, grad_output):
-        # when input > 0, then gradient is 1
-        # grad_relu.shape == grad_output.shape == grad.shape, relu doesn't change the shape of array
-        grad = self.input > 0    # array of true and false
-        grad_relu = grad_output * grad    
+    def backward(self, grad_output, learning_rate=None):
+        # when input > 0, keep the gradient, rest value gets 0
+        # grad_relu.shape == grad_output.shape == mask.shape, relu doesn't change the shape of array
+        mask = self.input > 0    # array of true and false
+        grad_relu = grad_output * mask    
         return grad_relu
 
 
-class MaxPool:
+class MaxPool(Layer):
     '''
-    MaxPool layer reduce the image size by keeping only the biggest value from filtered region.
+    MaxPool layer, reduce the image size by keeping only the biggest value from filtered region.
 
     Arguments: 
     filter_size -- int, height and width for each filter, square shape
@@ -258,7 +282,10 @@ class MaxPool:
 
     def __init__(self, filter_size):
         self.filter_size = filter_size
-        print('Max Pooling layer initialized.')
+        # print('Max Pooling layer initialized.')
+
+    def __repr__(self):
+        return f"MaxPool(filter_size={self.filter_size})"
 
     # return a one piece (slice) of array indicated by filter at a time, j - row idx, k - column idx
     def image_region(self, input):        
@@ -273,7 +300,7 @@ class MaxPool:
         for n in range(batch_size):
             for h in range(out_height):
                 for w in range(out_width):
-                    patch = input[n, (h * f):(h * f + f), (w * f):(w * f + f), :]    # (n, h*f:h*f+f, w*f:w*f+f, :) -> (f,f,num_filters)
+                    patch = input[n, (h * f):(h * f + f), (w * f):(w * f + f), :]    # (n, h*f:h*f+f, w*f:w*f+f, :) -> (f, f, channels)
                     yield patch, n, h, w    # return and pause
 
     def forward(self, input):
@@ -292,13 +319,18 @@ class MaxPool:
         for patch, n, h, w in self.image_region(input):
             maxpool_out[n, h, w, :] = np.amax(patch, axis = (0,1))    # max value in patch for each channel
 
-        print(f'Image patch shape: {patch.shape}')
-        print(f'Output shape: {maxpool_out.shape}')
+        # print('='*50)
+        # print(f'Input shape: {input.shape}')
+        # print('='*50)        
+        # print(f'Patch shape: {patch.shape}')
+        # print('='*50)
+        # print(f'MaxPool output shape: {maxpool_out.shape}')
+        # print('='*50) 
         return maxpool_out
 
-    def backward(self, grad_output):
+    def backward(self, grad_output, learning_rate=None):
         '''
-        gradient change has input only for max values in patch, the rest values is equal to 0
+        gradient change has input only for the max values in patch, the rest values is equal to 0
 
         grad_maxpool.shape == input.shape (from forward) 
 
@@ -307,11 +339,7 @@ class MaxPool:
 
         input = self.input
         batch_size, height, width, num_filters = input.shape
-        f = self.filter_size        
-
-        # height and width of output array
-        out_height = height // f   
-        out_width = width // f
+        f = self.filter_size
 
         # creating output array filled by 0
         grad_maxpool = np.zeros(input.shape)
@@ -335,16 +363,16 @@ class MaxPool:
         # return grad_maxpool    # shape (n, height, width, channels)
                 
 
-class Flatten:
+class Flatten(Layer):
     '''
-    Flatten layer turns input into a long 1D list of numbers.
+    Flatten layer, turns input into a long 1D list of numbers.
 
     Forward:
         Arguments:
             input -- array of shape (batch_size, height, width, channels)
         Returns:
             height * width * channels = n
-            flat_out -- array of shape (batch_size, height * width * channels,) -> (batch_size, n)
+            flat_out -- array of shape (batch_size, height * width * channels) -> (batch_size, n)
 
     Backward:
         Arguments:
@@ -354,7 +382,11 @@ class Flatten:
     '''
 
     def __init__(self):
-        print('Flattening layer initialized.')
+        # print('Flatten layer initialized.')
+        pass
+
+    def __repr__(self):
+        return f"Flatten()"
 
     def forward(self, input):
         # flat_out = []
@@ -364,35 +396,71 @@ class Flatten:
         #             flat_out.append(val)
         # flat_out = np.array([flat_out])    # provide the 1D shape (1,n), where n - features
 
-        # creating one dimensional list 
+        # creating one dimensional list }
         self.input_shape = input.shape
         batch_size = input.shape[0]
         # convert input array into 1D list of numbers (flatten()), reshape 1D array to 2D array (barch_size, n)
         flat_out = input.flatten().reshape(batch_size, -1)
-        print(f'Output shape: {flat_out.shape}')
+        # print('='*50)
+        # print(f'Input shape: {input.shape}')
+        # print('='*50)
+        # print(f'Flatten output shape: {flat_out.shape}')
+        # print('='*50)
         return flat_out
         
-    def backward(self, grad_output):
-        # grad_output.shape (batch_size, features), (batch_size, features = heightxwidthxdim) reshape it to forward input (batch_size, height, width, dim)
+    def backward(self, grad_output, learning_rate):
+        # grad_output.shape (batch_size, features), (batch_size, features = height*width*channels) reshape it to forward input (batch_size, height, width, channels)
         grad_flat = grad_output.reshape(self.input_shape)
-        return grad_flat    # (batch_size, height, width, dim)
+        return grad_flat    # (batch_size, height, width, channels)
 
 
-class FullyConnected:
+class Dense(Layer):
+    '''
+    Fully Connected layer, connects every input to every output.
+
+    Arguments:
+    input_size -- int, number of inputs (equal to flatten.shape[1])
+    output_size -- int, expected number of output (4, one for every bbox coordinates)
+
+    Forward:
+        Arguments:
+            input -- array of shape (batch_size, n)
+        Returns:
+            fc_out -- array of shape (batch_size, output_size)
+
+    Backward:
+        Arguments:
+            grad_output -- array of shape (batch_size, grad), the gradient propagated from the previous layer (MESLoss)
+        Returns:
+            grad_fc -- array of shape (batch_size, n)   
+    '''
+
     def __init__(self, input_size, output_size):
+        self.input_size = input_size
+        self.output_size = output_size
         self.weights = np.random.randn(input_size, output_size) * 0.1
         self.bias = np.zeros((1, output_size))
-        print(f'FullyConnected initialized: input_size={input_size}, output_size={output_size}')
+        # print(f'Dense layer initialized: input_size={input_size}, output_size={output_size}')
+
+    def __repr__(self):
+        return f"Dense(input_size={self.input_size}, output_size={self.output_size})"
 
     def forward(self, input):
         self.input = input
 
         # output = input x weights + biases
         fc_out = np.dot(input, self.weights) + self.bias
-        print(f'FC output shape: {fc_out.shape}')
+        # print('='*50)
+        # print(f'Input shape: {input.shape}')
+        # print('='*50)
+        # print(f'Weights shape: {self.weights.shape}')
+        # print(f'Biases shape: {self.bias.shape}')
+        # print('='*50)
+        # print(f'Fully Connected output shape: {fc_out.shape}')
+        # print('='*50)
         return fc_out
 
-    def backward(self, grad, learning_rate):
+    def backward(self, grad_output, learning_rate):
         '''
         input (1, input_size) => (1, 247744)
         weights (input_size, 4) => (247744, 4)
@@ -423,11 +491,11 @@ class FullyConnected:
         '''
         # gradients
         # dL/dW
-        grad_weights = np.dot(self.input.T, grad)    # (input_size, output_size) => (247744, 4)
+        grad_weights = np.dot(self.input.T, grad_output)    # (input_size, output_size) => (247744, 4)
         # dL/db
-        grad_bias = np.sum(grad, axis=0, keepdims=True)    # (1, 4), summing all rows
+        grad_bias = np.sum(grad_output, axis=0, keepdims=True)    # (1, 4), summing all rows
         # dL/dX
-        grad_fc = np.dot(grad, self.weights.T)
+        grad_fc = np.dot(grad_output, self.weights.T)
 
         # weight and bias update
         self.weights -= learning_rate * grad_weights
@@ -444,16 +512,23 @@ MSELoss -> FC -> Flatten -> MaxPool2 -> ReLU2 -> Conv2 -> MaxPool1 -> ReLU1 -> C
 grad -> grad_fc -> grad_flat -> grad_maxpool2 -> grad_relu2 -> grad_conv2 -> grad_maxpool -> grad_relu -> grad_conv
 '''
 
-class MSELoss:
+class MSELoss(Layer):
     def __init__(self):
-        print("Mean Squared Error loss initialized.")
+        # print("Mean Squared Error loss initialized.")
+        pass
 
-    def forward(self, y_original, y_predicted):
-        self.y_original = y_original
+    def __repr__(self):
+        return f"MSELoss()"
+
+    def forward(self, y_predicted, y_original):
         self.y_predicted = y_predicted
+        self.y_original = y_original
 
         # loss = 1/n * ∑(y_original - y_predicted)^2, where n - total number of elements (batch * bbox)
         loss = np.mean((y_predicted - y_original) ** 2)
+        # print('='*50)
+        # print(f'Loss: {loss}')
+        # print('='*50)
         return loss
 
     def backward(self):
@@ -461,4 +536,7 @@ class MSELoss:
         # dl/dy_pred = 2/n * (y_pred- y), where n - total number of elements (batch * bbox)
         n = self.y_original.size
         grad = (2 / n) * (self.y_predicted - self.y_original)
+        # print('='*50)
+        # print(f'Gradient for outputs: {grad}')
+        # print('='*50)
         return grad
