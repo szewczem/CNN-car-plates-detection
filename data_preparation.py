@@ -184,9 +184,9 @@ def load_prepared_data():
     return X_train, Y_train, X_test, Y_test, X_val, Y_val
 
 
-def load_data():
+def load_data(img_width, img_height):
     if not os.path.exists('./data/processed/X_train.npy'):
-        save_prepared_data(640, 400)
+        save_prepared_data(img_width, img_height)
         return load_prepared_data()
     else:
         return load_prepared_data()

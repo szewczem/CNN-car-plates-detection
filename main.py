@@ -6,10 +6,10 @@ import os
  
 
 if __name__ == "__main__":
-    X_train, Y_train, X_test, Y_test, X_val, Y_val = dp.load_data()
+    X_train, Y_train, X_test, Y_test, X_val, Y_val = dp.load_data(img_width=320, img_height=200)
 
-    X = X_train[0:3]
-    y_original = Y_train[0:3]
+    X = X_train[0:2]
+    Y = Y_train[0:2]
 
     # Initialize the CNN model    
     model = model.CNN()
@@ -27,3 +27,5 @@ if __name__ == "__main__":
     model.print_model_structure()
     
     loss_fn = MSELoss()
+
+    model.train(X, Y, 16, loss_fn, 3, 0.01)

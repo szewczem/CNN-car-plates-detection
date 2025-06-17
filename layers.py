@@ -16,6 +16,7 @@ class Layer:
     def backward(self, grad_output, learning_rate):
         pass
 
+
 '''
 Structure of CNN:
 1. Input: image - array of shape (400, 640, 1)
@@ -61,7 +62,7 @@ class Conv(Layer):
     def __init__(self, num_filters, filter_size, channels=1):
         self.num_filters = num_filters
         self.filter_size = filter_size
-        self.channels = channels        
+        self.channels = channels
         # initialization of n filters (kernels) with random values from normal distribution scales down by 10
         self.kernels = np.random.randn(num_filters, filter_size, filter_size, channels) * 0.1
         # number of biases == num_filters, all biases start at 0
@@ -71,13 +72,13 @@ class Conv(Layer):
     def __repr__(self):
         return f"Conv(kernels={self.num_filters}, filter_size={self.filter_size}, channels={self.channels})"
 
-    # return a one piece (slice) of input array indicated by filter at a time, h - row idx, w - column idx
+    # Return a one piece (slice) of input array indicated by filter at a time, h - row idx, w - column idx
     def image_region(self, input):
         self.input = input
         batch_size, height, width, channels = input.shape
         f = self.filter_size
 
-        # height and width of output array, last common row and column is the end of output array
+        # Height and width of output array, last common row and column is the end of output array
         out_height = height - f + 1
         out_width = width - f + 1
 
@@ -87,7 +88,7 @@ class Conv(Layer):
                     patch = input[n, h:(h + f), w:(w + f), :]    # patch shape (f, f, channels) for image n in batch_size
                     yield patch, n, h, w    # return and pause
 
-    # return the output array (feature map) of shape (batch_size, out_height, out_width, num_filters) where all elements from image_region() are multipled by kernel and summed
+    # Return the output array (feature map) of shape (batch_size, out_height, out_width, num_filters) where all elements from image_region() are multipled by kernel and summed
     def forward(self, input):
         self.input = input  
         batch_size, height, width, channels = input.shape
@@ -95,33 +96,21 @@ class Conv(Layer):
         f = self.filter_size
         b = self.biases
 
-        # height and width of output array
+        # Height and width of output array
         out_height = height - f + 1
         out_width = width - f + 1
 
-        # shape of output array filled by 0
+        # Shape of output array filled by 0
         conv_out = np.zeros((batch_size, out_height, out_width, num_filters))
 
-        # output array filled by sum of the multiplication between each input patch and each filter (kernel)
+        # Output array filled by sum of the multiplication between each input patch and each filter (kernel)
         for patch, n, h, w in self.image_region(input):
-            conv_out[n, h, w, :] = np.sum(patch * self.kernels, axis = (1,2,3)) + b    # 4D array filled by 1D output (one pixel/feature in image for every channels)
-
-        # print('='*50)
-        # print(f'Input shape: {input.shape}')
-        # print('='*50)
-        # print(f'Patch shape: {patch.shape}')
-        # print(f'Kernels shape: {self.kernels.shape}')
-        # print(f'Biases shape: {b.shape}')
-        # print(f'Patch * kernel shape: {(patch * self.kernels).shape}')
-        # print('='*50)
-        # print(f'Conv output shape: {conv_out.shape}')
-        # print('='*50)        
+            conv_out[n, h, w, :] = np.sum(patch * self.kernels, axis = (1, 2, 3)) + b    # 4D array filled by 1D output (one pixel/feature in image for every channels)      
         return conv_out
     
-    # kernels rotation function, rotate over rows and columns, channel stay intact
+    # Kernel rotation function, rotate over rows and columns, channels remain unchanged
     def rotate180(self, kernel):
-        kernel_180 = kernel[::-1, ::-1, :]
-        return kernel_180
+        return kernel[::-1, ::-1, :]
 
     def backward(self, grad_output, learning_rate):
         input = self.input    # from forward
@@ -129,8 +118,8 @@ class Conv(Layer):
         f = self.filter_size
         num_filters = self.num_filters
         
-        # arrays shape for kernels and conv gradients 
-        grad_kernels = np.zeros(self.kernels.shape)    # array of ashape (num_filters, filter_size, filter_size, channels)
+        # Shapes of arrays for kernels and convolution gradients
+        grad_kernels = np.zeros(self.kernels.shape)    # array of shape (num_filters, filter_size, filter_size, channels)
         grad_conv = np.zeros(input.shape)    # array of shape (batch_size, out_height, out_width, channels) == input.shape (from forward)
         grad_biases = np.zeros(self.biases.shape)      
 
@@ -191,12 +180,14 @@ class Conv(Layer):
             dl/db = ∑(dl/dz)
         '''
 
-        # gradient for kernels: loop through patch, where n is the idx of image, h - row idx, w - column idx, update grad of every filter (kernel), dl/dk = [a] * [dl/dz]
+        # Gradients for kernels
+        # loop through patch, where n is the idx of image, h - row idx, w - column idx, update grad of every filter (kernel), dl/dk = [a] * [dl/dz]
         for patch, n, h, w in self.image_region(input):
             for k in range(num_filters):
                 grad_kernels[k] += patch * grad_output[n, h, w, k]    # patch shape (f, f, channels), kernels change                
 
-        # gradient for input: for grad_output (image) n from previous layer and all its channels, filter k and all its channels do full convolution, dl/da = cov(dl/dz, 180deg*kernel)
+        # Gradients for input and biases
+        # for grad_output (image) n from previous layer and all its channels, filter k and all its channels do full convolution, dl/da = cov(dl/dz, 180deg*kernel)
         for n in range(batch_size):
             for k in range(num_filters):          
                 rotated_kernel = self.rotate180(self.kernels[k])    # kernel k rotated by 180deg
@@ -208,11 +199,13 @@ class Conv(Layer):
                             grad_conv[n, h:(h + f), w:(w + f), c] += grad_output_per_kernel[h, w] * rotated_kernel[:, :, c]
                 # grad_conv[n, :, :, c] += signal.convolve2d(grad_output[n, :, :, k], rotated_kernel[:, :, c], mode="full")
 
-                # gradients for biases, dl/db = ∑(dl/dz)
+                # dl/db = ∑(dl/dz)
                 grad_biases[k] += np.sum(grad_output_per_kernel)              
 
-        # filter params update, k = k - learning_rate * dl/dk, b = b - learning_rate 
-        self.kernels -= learning_rate * grad_kernels
+        # Update parameters
+        # k = k - learning_rate * dl/dk
+        self.kernels -= learning_rate * grad_kernels                
+        # b = b - learning_rate * dl/db
         self.biases -= learning_rate * grad_biases
         return grad_conv
 
@@ -242,18 +235,14 @@ class ReLU(Layer):
         return f"ReLU()"
 
     def forward(self, input):
+        # Return 0 for every value in the array that is less than or equal to 0
         # f(x) = max(0,x), if input <= 0 then 0
         self.input = input 
         relu_out = np.maximum(0, input)
-        # print('='*50)
-        # print(f'Input shape: {input.shape}')
-        # print('='*50)
-        # print(f'ReLU output shape: {relu_out.shape}')
-        # print('='*50) 
         return relu_out
 
     def backward(self, grad_output, learning_rate=None):
-        # when input > 0, keep the gradient, rest value gets 0
+        # When input > 0, keep the gradient, rest values get 0
         # grad_relu.shape == grad_output.shape == mask.shape, relu doesn't change the shape of array
         mask = self.input > 0    # array of true and false
         grad_relu = grad_output * mask    
@@ -287,12 +276,12 @@ class MaxPool(Layer):
     def __repr__(self):
         return f"MaxPool(filter_size={self.filter_size})"
 
-    # return a one piece (slice) of array indicated by filter at a time, j - row idx, k - column idx
+    # Return a one piece (slice) of array indicated by filter at a time, j - row idx, k - column idx
     def image_region(self, input):        
         batch_size, height, width, channels = input.shape
         f = self.filter_size
 
-        # height and width of output array
+        # Height and width of output array
         # for filter of size nxn and stride n, the output dimensions will be n times smaller in each dimension (height and width)
         out_height = height // f   
         out_width = width // f
@@ -308,29 +297,21 @@ class MaxPool(Layer):
         batch_size, height, width, num_filters = input.shape
         f = self.filter_size
 
-        # height and width of output array
+        # Height and width of output array
         out_height = height // f   
         out_width = width // f
 
-        # shape of output array
+        # Shape of output array filled by 0
         maxpool_out = np.zeros((batch_size, out_height, out_width, num_filters))
 
-        # fill maxpool_out with max value in the patch for each channel
+        # Fill maxpool_out with max value in the patch for each channel
         for patch, n, h, w in self.image_region(input):
-            maxpool_out[n, h, w, :] = np.amax(patch, axis = (0,1))    # max value in patch for each channel
-
-        # print('='*50)
-        # print(f'Input shape: {input.shape}')
-        # print('='*50)        
-        # print(f'Patch shape: {patch.shape}')
-        # print('='*50)
-        # print(f'MaxPool output shape: {maxpool_out.shape}')
-        # print('='*50) 
+            maxpool_out[n, h, w, :] = np.amax(patch, axis = (0, 1))    # max value in patch for each channel
         return maxpool_out
 
     def backward(self, grad_output, learning_rate=None):
         '''
-        gradient change has input only for the max values in patch, the rest values is equal to 0
+        Gradient change has input only for the max values in patch, the rest values is equal to 0.
 
         grad_maxpool.shape == input.shape (from forward) 
 
@@ -338,13 +319,12 @@ class MaxPool(Layer):
         '''
 
         input = self.input
-        batch_size, height, width, num_filters = input.shape
         f = self.filter_size
 
-        # creating output array filled by 0
+        # Create output array filled by 0
         grad_maxpool = np.zeros(input.shape)
 
-        # update grad_maxpool, values that was max in the input filtered patch gets gradient from grad_output
+        # Update grad_maxpool, values that was max in the input filtered patch gets gradient from grad_output
         for patch, n, h, w in self.image_region(input):
             max_vals = np.amax(patch, axis=(0, 1), keepdims=True)    # keep the max value from the patch
             mask = (patch == max_vals)    # if value in patch is max then True, array of shape (h, w, channels)
@@ -396,16 +376,12 @@ class Flatten(Layer):
         #             flat_out.append(val)
         # flat_out = np.array([flat_out])    # provide the 1D shape (1,n), where n - features
 
-        # creating one dimensional list }
+        # Create one dimensional list
         self.input_shape = input.shape
         batch_size = input.shape[0]
-        # convert input array into 1D list of numbers (flatten()), reshape 1D array to 2D array (barch_size, n)
+
+        # Convert input array into 1D list of numbers (flatten()), reshape 1D array to 2D array (barch_size, n)
         flat_out = input.flatten().reshape(batch_size, -1)
-        # print('='*50)
-        # print(f'Input shape: {input.shape}')
-        # print('='*50)
-        # print(f'Flatten output shape: {flat_out.shape}')
-        # print('='*50)
         return flat_out
         
     def backward(self, grad_output, learning_rate):
@@ -448,16 +424,9 @@ class Dense(Layer):
     def forward(self, input):
         self.input = input
 
+        # Dot product of input array and weights array (batch_size, n) . (input_size, output_size), where n == input_size and output_size == bbox.size (4)
         # output = input x weights + biases
         fc_out = np.dot(input, self.weights) + self.bias
-        # print('='*50)
-        # print(f'Input shape: {input.shape}')
-        # print('='*50)
-        # print(f'Weights shape: {self.weights.shape}')
-        # print(f'Biases shape: {self.bias.shape}')
-        # print('='*50)
-        # print(f'Fully Connected output shape: {fc_out.shape}')
-        # print('='*50)
         return fc_out
 
     def backward(self, grad_output, learning_rate):
@@ -489,7 +458,7 @@ class Dense(Layer):
 
             dl/db = np.sum(grad)   ->   grad.shape(1, 4)
         '''
-        # gradients
+        # Gradients
         # dL/dW
         grad_weights = np.dot(self.input.T, grad_output)    # (input_size, output_size) => (247744, 4)
         # dL/db
@@ -497,10 +466,11 @@ class Dense(Layer):
         # dL/dX
         grad_fc = np.dot(grad_output, self.weights.T)
 
-        # weight and bias update
+        # Weight and bias update
         self.weights -= learning_rate * grad_weights
         self.bias -= learning_rate * grad_bias
         return grad_fc
+
 
 '''
 Forwardpropagation:
@@ -511,6 +481,7 @@ Backpropagation:
 MSELoss -> FC -> Flatten -> MaxPool2 -> ReLU2 -> Conv2 -> MaxPool1 -> ReLU1 -> Conv1
 grad -> grad_fc -> grad_flat -> grad_maxpool2 -> grad_relu2 -> grad_conv2 -> grad_maxpool -> grad_relu -> grad_conv
 '''
+
 
 class MSELoss(Layer):
     def __init__(self):
@@ -524,19 +495,14 @@ class MSELoss(Layer):
         self.y_predicted = y_predicted
         self.y_original = y_original
 
+        # Loss function
         # loss = 1/n * ∑(y_original - y_predicted)^2, where n - total number of elements (batch * bbox)
         loss = np.mean((y_predicted - y_original) ** 2)
-        # print('='*50)
-        # print(f'Loss: {loss}')
-        # print('='*50)
         return loss
 
     def backward(self):
-        # gradient of the loss, batch size = 2^n
+        # Gradient of the loss, batch size = 2^n
         # dl/dy_pred = 2/n * (y_pred- y), where n - total number of elements (batch * bbox)
         n = self.y_original.size
         grad = (2 / n) * (self.y_predicted - self.y_original)
-        # print('='*50)
-        # print(f'Gradient for outputs: {grad}')
-        # print('='*50)
         return grad
