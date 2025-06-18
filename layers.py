@@ -392,7 +392,7 @@ class Flatten(Layer):
 
 class Dense(Layer):
     '''
-    Fully Connected layer, connects every input to every output.
+    Fully Connected (Dense) layer, connects every input to every output.
 
     Arguments:
     input_size -- int, number of inputs (equal to flatten.shape[1])

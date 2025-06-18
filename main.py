@@ -6,26 +6,31 @@ import os
  
 
 if __name__ == "__main__":
-    X_train, Y_train, X_test, Y_test, X_val, Y_val = dp.load_data(img_width=320, img_height=200)
+    X_train, Y_train, X_test, Y_test, X_val, Y_val, original_train, original_test, original_val, filename_train, filename_test, filename_val = dp.load_data(img_width=320, img_height=200)
 
     X = X_train[0:2]
     Y = Y_train[0:2]
+    original_size = original_train[0:2]
+    filename_train = filename_train[0:2]
 
     # Initialize the CNN model    
-    model = model.CNN()
+    cnn = model.CNN()
 
     # Add layers to model
-    model.add_layer(Conv(8, 3, 1))
-    model.add_layer(ReLU())
-    model.add_layer(MaxPool(2))
-    model.add_layer(Conv(16, 3, 8))
-    model.add_layer(ReLU())
-    model.add_layer(MaxPool(2))
-    model.add_layer(Flatten())
-    model.add_layer(Dense(247744, 4))
+    cnn.add_layer(Conv(8, 3, 1))
+    cnn.add_layer(ReLU())
+    cnn.add_layer(MaxPool(2))
+    cnn.add_layer(Conv(16, 3, 8))
+    cnn.add_layer(ReLU())
+    cnn.add_layer(MaxPool(2))
+    cnn.add_layer(Flatten())
+    cnn.add_layer(Dense(59904, 4))
 
-    model.print_model_structure()
+    cnn.print_model_structure()
     
     loss_fn = MSELoss()
 
-    model.train(X, Y, 16, loss_fn, 3, 0.01)
+    loss_per_epochs, avg_accuracy, rescaled_bboxs_predicted_list, rescaled_bboxs_original_list = cnn.train(X, Y, original_size, 16, loss_fn, 25, 0.01)
+
+    print(rescaled_bboxs_predicted_list)
+    print(rescaled_bboxs_original_list)

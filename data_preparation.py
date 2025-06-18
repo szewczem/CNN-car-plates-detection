@@ -30,7 +30,7 @@ def write_to_csv(plates):
         writer.writerow({'name': name, 'xtl': xtl, 'ytl': ytl, 'xbr': xbr, 'ybr': ybr, 'img_width': img_width, 'img_height': img_height})
 
 
-# Create the list of dict [{'X: path, 'Y': xtl, ytl, xbr, ybr, width, height}]
+# Create the list of dict [{'X: path, 'Y': name, xtl, ytl, xbr, ybr, width, height}]
 def data_list(data_img_path):
     # data_img_path = "./data/photos/"
     images = os.listdir(data_img_path)
@@ -43,7 +43,7 @@ def data_list(data_img_path):
             reader_file = csv.reader(file)
             for row in reader_file:
                 if row[0] == img:
-                    all_data.append({"X": img_path, "Y": row[1:]})
+                    all_data.append({"X": img_path, "Y": row[:]})
     return all_data
 # all_data = data_list()
 
@@ -63,15 +63,18 @@ def img_set_size(all_data, new_width, new_height):
         img = cv.imread(example['X'])
         resized_img = cv.resize(img, (new_width, new_height))
 
+        # Get filename
+        name = example['Y'][0]
+
         # Normalize bbox values (0-1 value)
-        xtl, ytl, xbr, ybr, img_width, img_height = map(float, example['Y'])
+        xtl, ytl, xbr, ybr, img_width, img_height = map(float, example['Y'][1:])
         xtl_norm = xtl / img_width
         ytl_norm = ytl / img_height
         xbr_norm = xbr / img_width
         ybr_norm = ybr / img_height
 
         # Save resized example
-        all_data_resized.append({'X': resized_img, 'Y': [xtl_norm, ytl_norm, xbr_norm, ybr_norm], 'original_size': (img_width, img_height)})
+        all_data_resized.append({'X': resized_img, 'Y': [xtl_norm, ytl_norm, xbr_norm, ybr_norm], 'original_size': [img_width, img_height], 'filename': name})
 
     return all_data_resized
 
@@ -82,7 +85,7 @@ def data_list_processed(all_data_resized):
 
     for img in all_data_resized:
         img_gray = cv.cvtColor(img['X'], cv.COLOR_BGR2GRAY)
-        all_data_processed.append({"X": img_gray, "Y": img['Y'], "original_size": img['original_size']})
+        all_data_processed.append({"X": img_gray, "Y": img['Y'], "original_size": img['original_size'], 'filename': img['filename']})
 
     # Shuffle the resized and converted to grayscale data list    
     random.seed(42)
@@ -94,44 +97,53 @@ def data_list_processed(all_data_resized):
 def normalize_data_input(all_data_processed):
     X = np.array([example['X'] for example in all_data_processed])
     Y = np.array([example['Y'] for example in all_data_processed])
-    original_size = [example['original_size'] for example in all_data_processed]
+    original_size = np.array([example['original_size'] for example in all_data_processed])
+    filename = [example['filename'] for example in all_data_processed]
 
     # normalize pixel value (0-1 value)
     X = np.array(X, dtype=np.float32) / 255.0
     Y = np.array(Y, dtype=np.float32)
+    original_size = np.array(original_size, dtype=np.int32)
 
     # 2D shape in grayscale, adding new dimension
     X = X[..., np.newaxis]
 
     print(f"Input feature (X): {X.shape}, target (Y): {Y.shape}")
-    return X, Y, original_size
+    return X, Y, original_size, filename
 
 
 # Prepare sets: training - 70%, test - 15%, validation - 15%
-def data_split(X, Y, original_size):
+def data_split(X, Y, original_size, filename):
     split_ratio = 0.7
     split_idx = int(np.ceil(len(Y)*split_ratio))
   
+    # Training set
     X_train = X[:split_idx,:,:,:]
     Y_train = Y[:split_idx,:]
     original_train = original_size[:split_idx]
+    filename_train = filename[:split_idx]
 
+    # Test and Validation set
     X_test_and_val = X[split_idx:,:,:,:]
     Y_test_and_val = Y[split_idx:,:]
-    original_test_and_val = original_size[split_idx:]  
-    
+    original_test_and_val = original_size[split_idx:]
+    filename_test_and_val = filename[split_idx:]    
 
+    # Test set
     half = int(len(Y_test_and_val)//2)
     X_test = X_test_and_val[:half,:,:,:]
     Y_test = Y_test_and_val[:half,:]
     original_test = original_test_and_val[:half]
+    filename_test = filename_test_and_val[:half]
 
+    # Validation set
     X_val = X_test_and_val[half:,:,:,:]    
     Y_val = Y_test_and_val[half:,:]
     original_val = original_test_and_val[half:]
+    filename_val= filename_test_and_val[half:]
 
     print(f"Number of examples in train set: {len(X_train)}\nNumber of examples in test set: {len(X_test)}\nNumber of examples in validation set: {len(X_val)}")
-    return X_train, Y_train, X_test, Y_test, X_val, Y_val, original_train, original_test, original_val
+    return X_train, Y_train, X_test, Y_test, X_val, Y_val, original_train, original_test, original_val, filename_train, filename_test, filename_val
 
 
 def save_prepared_data(new_width, new_height):
@@ -151,24 +163,30 @@ def save_prepared_data(new_width, new_height):
     # Convert to garyscale and shuffle
     all_data_processed = data_list_processed(all_data_resized)
 
-    # prepare input for CNN
-    X, Y, original_size = normalize_data_input(all_data_processed)
+    # Prepare input for CNN
+    X, Y, original_size, filename = normalize_data_input(all_data_processed)
 
     # Split for training, test and valid dataset
-    X_train, Y_train, X_test, Y_test, X_val, Y_val, orig_train, orig_test, orig_val = data_split(X, Y, original_size)
+    X_train, Y_train, X_test, Y_test, X_val, Y_val, original_train, original_test, original_val, filename_train, filename_test, filename_val = data_split(X, Y, original_size, filename)
 
-    # save prepared stets
+    # Save prepared stets
     # training set
     np.save('./data/processed/X_train.npy', X_train)
-    np.save('./data/processed/y_train.npy', Y_train)
-    
+    np.save('./data/processed/Y_train.npy', Y_train)
+    np.save('./data/processed/original_train.npy', original_train)
+    np.save('./data/processed/filename_train.npy', filename_train)
+
     # test set
     np.save('./data/processed/X_test.npy', X_test)
-    np.save('./data/processed/y_test.npy', Y_test)
+    np.save('./data/processed/Y_test.npy', Y_test)
+    np.save('./data/processed/original_test.npy', original_test)
+    np.save('./data/processed/filename_test.npy', filename_test)
 
     # validation set
     np.save('./data/processed/X_val.npy', X_val)
     np.save('./data/processed/Y_val.npy', Y_val)
+    np.save('./data/processed/original_val.npy', original_val)
+    np.save('./data/processed/filename_val.npy', filename_val)
 
     print("Data preparation and saving complete.")
 
@@ -180,8 +198,14 @@ def load_prepared_data():
     Y_test = np.load('./data/processed/Y_test.npy')
     X_val = np.load('./data/processed/X_val.npy')
     Y_val = np.load('./data/processed/Y_val.npy')
+    original_train = np.load('./data/processed/original_train.npy')
+    original_test = np.load('./data/processed/original_test.npy')
+    original_val = np.load('./data/processed/original_val.npy')
+    filename_train = np.load('./data/processed/filename_train.npy')
+    filename_test = np.load('./data/processed/filename_test.npy')
+    filename_val = np.load('./data/processed/filename_val.npy')
     print("Data loaded.")
-    return X_train, Y_train, X_test, Y_test, X_val, Y_val
+    return X_train, Y_train, X_test, Y_test, X_val, Y_val, original_train, original_test, original_val, filename_train, filename_test, filename_val
 
 
 def load_data(img_width, img_height):
@@ -198,16 +222,19 @@ def output_array_tolist(predicted_array):
 
 
 def rescale_bbox(predicted_values, original_size):
-    xtl_n, ytl_n, xbr_n, ybr_n = predicted_values
-    img_width, img_height = original_size
+    rescaled_bboxs = []
+    for bbox, size in zip(predicted_values, original_size):
+        xtl_n, ytl_n, xbr_n, ybr_n = bbox
+        img_width, img_height = size
 
-    # Rescale back to original image size
-    xtl = xtl_n * img_width
-    ytl = ytl_n * img_height
-    xbr = xbr_n * img_width
-    ybr = ybr_n * img_height
+        # Rescale back to original image size
+        xtl = xtl_n * img_width
+        ytl = ytl_n * img_height
+        xbr = xbr_n * img_width
+        ybr = ybr_n * img_height
 
-    return [xtl, ytl, xbr, ybr]
+        rescaled_bboxs.append([float(xtl), float(ytl), float(xbr), float(ybr)])
+    return rescaled_bboxs
 
 
 # PLOTS
