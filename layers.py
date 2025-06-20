@@ -194,10 +194,12 @@ class Conv(Layer):
                 grad_output_per_kernel = grad_output[n, :, :, k]    # gradient loss with respect to output filter, shape (h, w)
 
                 for c in range(channels):                    
-                    for h in range(grad_output_per_kernel.shape[0]):
-                        for w in range(grad_output_per_kernel.shape[1]):
-                            grad_conv[n, h:(h + f), w:(w + f), c] += grad_output_per_kernel[h, w] * rotated_kernel[:, :, c]
-                # grad_conv[n, :, :, c] += signal.convolve2d(grad_output[n, :, :, k], rotated_kernel[:, :, c], mode="full")
+                    # for h in range(grad_output_per_kernel.shape[0]):
+                    #     for w in range(grad_output_per_kernel.shape[1]):
+                    #         grad_conv[n, h:(h + f), w:(w + f), c] += grad_output_per_kernel[h, w] * rotated_kernel[:, :, c]
+
+                    '''for training taime optimalisation below method was used'''
+                    grad_conv[n, :, :, c] += signal.convolve2d(grad_output[n, :, :, k], rotated_kernel[:, :, c], mode="full")
 
                 # dl/db = ∑(dl/dz)
                 grad_biases[k] += np.sum(grad_output_per_kernel)              
@@ -415,7 +417,7 @@ class Dense(Layer):
         self.input_size = input_size
         self.output_size = output_size
         self.weights = np.random.randn(input_size, output_size) * 0.1
-        self.bias = np.zeros((1, output_size))
+        self.biases = np.zeros((1, output_size))
         # print(f'Dense layer initialized: input_size={input_size}, output_size={output_size}')
 
     def __repr__(self):
@@ -426,18 +428,18 @@ class Dense(Layer):
 
         # Dot product of input array and weights array (batch_size, n) . (input_size, output_size), where n == input_size and output_size == bbox.size (4)
         # output = input x weights + biases
-        fc_out = np.dot(input, self.weights) + self.bias
+        fc_out = np.dot(input, self.weights) + self.biases
         return fc_out
 
     def backward(self, grad_output, learning_rate):
         '''
         input (1, input_size) => (1, 247744)
         weights (input_size, 4) => (247744, 4)
-        bias (1, output_size) => (1, 4)
+        biases (1, output_size) => (1, 4)
         output = input x weights + biases => output (1, 4)
         grad_output (1, 4)
 
-        l - loss, w - weights, b - bias
+        l - loss, w - weights, b - biases
 
         l = 1/n * ∑(y_pred - y)^2
         y_pred = w * x + b
@@ -462,13 +464,13 @@ class Dense(Layer):
         # dL/dW
         grad_weights = np.dot(self.input.T, grad_output)    # (input_size, output_size) => (247744, 4)
         # dL/db
-        grad_bias = np.sum(grad_output, axis=0, keepdims=True)    # (1, 4), summing all rows
+        grad_biases = np.sum(grad_output, axis=0, keepdims=True)    # (1, 4), summing all rows
         # dL/dX
         grad_fc = np.dot(grad_output, self.weights.T)
 
         # Weight and bias update
         self.weights -= learning_rate * grad_weights
-        self.bias -= learning_rate * grad_bias
+        self.biases -= learning_rate * grad_biases
         return grad_fc
 
 

@@ -9,10 +9,10 @@ import matplotlib.patches as patches
 from PIL import Image
 
 
-# LOADING DATA TO CSV
+# ==================== LOADING DATA FROM XML TO CSV ====================
 # writing the plates location from .xml to .csv ('name', 'x_top_left', 'y_top_left', 'x_bottom_right', 'y_bottom_right')
 def write_to_csv(plates):
-    csvfile = open('./data/original/csv_plates.csv', 'w', newline='')
+    csvfile = open('./data/original/plates.csv', 'w', newline='')
     fieldnames = ['name', 'xtl', 'ytl', 'xbr', 'ybr', 'img_width', 'img_height']
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
     writer.writeheader()
@@ -30,34 +30,47 @@ def write_to_csv(plates):
         writer.writerow({'name': name, 'xtl': xtl, 'ytl': ytl, 'xbr': xbr, 'ybr': ybr, 'img_width': img_width, 'img_height': img_height})
 
 
-# Create the list of dict [{'X: path, 'Y': name, xtl, ytl, xbr, ybr, width, height}]
-def data_list(data_img_path):
-    # data_img_path = "./data/photos/"
-    images = os.listdir(data_img_path)
-    all_data = []
-    
-    for img in images:
-        img_path = os.path.join(data_img_path, img)
+# ==================== LOADING DATA FROM CSV ====================
+# List of .csv and .jpg path for coressponding samples
+sources = [
+    ("./data/original/plates.csv", "./data/original/photos/"),
+    ("./data/original/flipped_plates.csv", "./data/original/flipped_photos/"),
+    ("./data/original/noise_plates.csv", "./data/original/noise_photos/"),
+    ("./data/original/flipped_noise_plates.csv", "./data/original/flipped_noise_photos/")
+]
 
-        with open('./data/original/csv_plates.csv') as file:
+
+# Create the list of dict [{'X: path, 'Y': name, xtl, ytl, xbr, ybr, width, height}] for all sources
+def data_list_from_multiple_csv(sources):
+    '''
+    data -- list of tuples, (csv_path, image_dir)
+    '''
+    all_data = []
+    for csv_path, img_dir in sources :
+        with open(csv_path) as file:
             reader_file = csv.reader(file)
+            next(reader_file)  # skip header
             for row in reader_file:
-                if row[0] == img:
+                img_name = row[0]
+                img_path = os.path.join(img_dir, img_name)
+                if os.path.exists(img_path):
                     all_data.append({"X": img_path, "Y": row[:]})
     return all_data
-# all_data = data_list()
 
 
-# IMAGE PRPROCESSING
+# ==================== IMAGE PREPROCESSING ====================
 # Image resising, normalize bbox data (0-1 value), output [{'X': img_array(for color), 'Y': xtl_norm, ytl_norm, xbr_norm, ybr_norm}]
 def img_set_size(all_data, new_width, new_height):
     all_data_resized = []
     number_of_examples = len(all_data)
-    processing_part = int(number_of_examples / 5)
+    parts = 5
+    processing_part = int(number_of_examples / parts)
+    numer_of_part = 0
 
     for i, example in enumerate(all_data):
         if (i + 1) % processing_part == 0:
-            print(f'processing {i + 1}')
+            numer_of_part += 1
+            print(f'processing {numer_of_part}/{parts}')
 
         # Load and resize image
         img = cv.imread(example['X'])
@@ -74,7 +87,7 @@ def img_set_size(all_data, new_width, new_height):
         ybr_norm = ybr / img_height
 
         # Save resized example
-        all_data_resized.append({'X': resized_img, 'Y': [xtl_norm, ytl_norm, xbr_norm, ybr_norm], 'original_size': [img_width, img_height], 'filename': name})
+        all_data_resized.append({'X': resized_img, 'Y': [xtl_norm, ytl_norm, xbr_norm, ybr_norm], 'true_size_size': [img_width, img_height], 'filename': name})
 
     return all_data_resized
 
@@ -85,7 +98,7 @@ def data_list_processed(all_data_resized):
 
     for img in all_data_resized:
         img_gray = cv.cvtColor(img['X'], cv.COLOR_BGR2GRAY)
-        all_data_processed.append({"X": img_gray, "Y": img['Y'], "original_size": img['original_size'], 'filename': img['filename']})
+        all_data_processed.append({"X": img_gray, "Y": img['Y'], "true_size_size": img['true_size_size'], 'filename': img['filename']})
 
     # Shuffle the resized and converted to grayscale data list    
     random.seed(42)
@@ -97,65 +110,60 @@ def data_list_processed(all_data_resized):
 def normalize_data_input(all_data_processed):
     X = np.array([example['X'] for example in all_data_processed])
     Y = np.array([example['Y'] for example in all_data_processed])
-    original_size = np.array([example['original_size'] for example in all_data_processed])
+    true_size_size = np.array([example['true_size_size'] for example in all_data_processed])
     filename = [example['filename'] for example in all_data_processed]
 
     # normalize pixel value (0-1 value)
     X = np.array(X, dtype=np.float32) / 255.0
     Y = np.array(Y, dtype=np.float32)
-    original_size = np.array(original_size, dtype=np.int32)
+    true_size_size = np.array(true_size_size, dtype=np.int32)
 
     # 2D shape in grayscale, adding new dimension
     X = X[..., np.newaxis]
 
     print(f"Input feature (X): {X.shape}, target (Y): {Y.shape}")
-    return X, Y, original_size, filename
+    return X, Y, true_size_size, filename
 
 
 # Prepare sets: training - 70%, test - 15%, validation - 15%
-def data_split(X, Y, original_size, filename):
+def data_split(X, Y, true_size_size, filename):
     split_ratio = 0.7
     split_idx = int(np.ceil(len(Y)*split_ratio))
   
     # Training set
     X_train = X[:split_idx,:,:,:]
     Y_train = Y[:split_idx,:]
-    original_train = original_size[:split_idx]
+    true_size_train = true_size_size[:split_idx]
     filename_train = filename[:split_idx]
 
     # Test and Validation set
     X_test_and_val = X[split_idx:,:,:,:]
     Y_test_and_val = Y[split_idx:,:]
-    original_test_and_val = original_size[split_idx:]
+    true_size_test_and_val = true_size_size[split_idx:]
     filename_test_and_val = filename[split_idx:]    
 
     # Test set
     half = int(len(Y_test_and_val)//2)
     X_test = X_test_and_val[:half,:,:,:]
     Y_test = Y_test_and_val[:half,:]
-    original_test = original_test_and_val[:half]
+    true_size_test = true_size_test_and_val[:half]
     filename_test = filename_test_and_val[:half]
 
     # Validation set
     X_val = X_test_and_val[half:,:,:,:]    
     Y_val = Y_test_and_val[half:,:]
-    original_val = original_test_and_val[half:]
+    true_size_val = true_size_test_and_val[half:]
     filename_val= filename_test_and_val[half:]
 
     print(f"Number of examples in train set: {len(X_train)}\nNumber of examples in test set: {len(X_test)}\nNumber of examples in validation set: {len(X_val)}")
-    return X_train, Y_train, X_test, Y_test, X_val, Y_val, original_train, original_test, original_val, filename_train, filename_test, filename_val
+    return X_train, Y_train, X_test, Y_test, X_val, Y_val, true_size_train, true_size_test, true_size_val, filename_train, filename_test, filename_val
 
 
-def save_prepared_data(new_width, new_height):
+def save_prepared_data(sources, new_width, new_height):
     print("Starting data preprocesing...")
 
-    # XML to CSV
-    xml = parse('./data/original/annotations.xml')
-    plates = xml.getElementsByTagName('image')
-    write_to_csv(plates)
-
     # CSV to data list
-    all_data = data_list("./data/original/photos/")
+    all_data = data_list_from_multiple_csv(sources)
 
     # Resize and normalize bbox
     all_data_resized = img_set_size(all_data, new_width, new_height)
@@ -164,28 +172,28 @@ def save_prepared_data(new_width, new_height):
     all_data_processed = data_list_processed(all_data_resized)
 
     # Prepare input for CNN
-    X, Y, original_size, filename = normalize_data_input(all_data_processed)
+    X, Y, true_size_size, filename = normalize_data_input(all_data_processed)
 
     # Split for training, test and valid dataset
-    X_train, Y_train, X_test, Y_test, X_val, Y_val, original_train, original_test, original_val, filename_train, filename_test, filename_val = data_split(X, Y, original_size, filename)
+    X_train, Y_train, X_test, Y_test, X_val, Y_val, true_size_train, true_size_test, true_size_val, filename_train, filename_test, filename_val = data_split(X, Y, true_size_size, filename)
 
     # Save prepared stets
     # training set
     np.save('./data/processed/X_train.npy', X_train)
     np.save('./data/processed/Y_train.npy', Y_train)
-    np.save('./data/processed/original_train.npy', original_train)
+    np.save('./data/processed/true_size_train.npy', true_size_train)
     np.save('./data/processed/filename_train.npy', filename_train)
 
     # test set
     np.save('./data/processed/X_test.npy', X_test)
     np.save('./data/processed/Y_test.npy', Y_test)
-    np.save('./data/processed/original_test.npy', original_test)
+    np.save('./data/processed/true_size_test.npy', true_size_test)
     np.save('./data/processed/filename_test.npy', filename_test)
 
     # validation set
     np.save('./data/processed/X_val.npy', X_val)
     np.save('./data/processed/Y_val.npy', Y_val)
-    np.save('./data/processed/original_val.npy', original_val)
+    np.save('./data/processed/true_size_val.npy', true_size_val)
     np.save('./data/processed/filename_val.npy', filename_val)
 
     print("Data preparation and saving complete.")
@@ -198,19 +206,19 @@ def load_prepared_data():
     Y_test = np.load('./data/processed/Y_test.npy')
     X_val = np.load('./data/processed/X_val.npy')
     Y_val = np.load('./data/processed/Y_val.npy')
-    original_train = np.load('./data/processed/original_train.npy')
-    original_test = np.load('./data/processed/original_test.npy')
-    original_val = np.load('./data/processed/original_val.npy')
+    true_size_train = np.load('./data/processed/true_size_train.npy')
+    true_size_test = np.load('./data/processed/true_size_test.npy')
+    true_size_val = np.load('./data/processed/true_size_val.npy')
     filename_train = np.load('./data/processed/filename_train.npy')
     filename_test = np.load('./data/processed/filename_test.npy')
     filename_val = np.load('./data/processed/filename_val.npy')
     print("Data loaded.")
-    return X_train, Y_train, X_test, Y_test, X_val, Y_val, original_train, original_test, original_val, filename_train, filename_test, filename_val
+    return X_train, Y_train, X_test, Y_test, X_val, Y_val, true_size_train, true_size_test, true_size_val, filename_train, filename_test, filename_val
 
 
-def load_data(img_width, img_height):
+def load_data(sources, img_width, img_height):
     if not os.path.exists('./data/processed/X_train.npy'):
-        save_prepared_data(img_width, img_height)
+        save_prepared_data(sources, img_width, img_height)
         return load_prepared_data()
     else:
         return load_prepared_data()
@@ -221,9 +229,22 @@ def output_array_tolist(predicted_array):
     return predicted_values
 
 
-def rescale_bbox(predicted_values, original_size):
+# def rescale_bbox(predicted_values, true_size):
+#     pred = np.array(predicted_values)
+#     true = np.array(true_size)
+
+#     xtl = [pred[:, 0] * true[:, 0]]
+#     ytl = [pred[:, 1] * true[:, 1]]
+#     xbr = [pred[:, 2] * true[:, 0]]
+#     ybr = [pred[:, 3] * true[:, 1]]
+
+#     rescaled_bboxs = np.stack([xtl, ytl, xbr, ybr], axis=1)
+#     return rescaled_bboxs
+
+
+def rescale_bbox(predicted_values, true_size):
     rescaled_bboxs = []
-    for bbox, size in zip(predicted_values, original_size):
+    for bbox, size in zip(predicted_values, true_size):
         xtl_n, ytl_n, xbr_n, ybr_n = bbox
         img_width, img_height = size
 
@@ -251,7 +272,7 @@ def plot_images_with_bounding_boxes(all_data):
         ax.imshow(img)
         
         # Red bounding box
-        xtl, ytl, xbr, ybr, img_width, img_height = map(float, example['Y'])
+        xtl, ytl, xbr, ybr, img_width, img_height = map(float, example['Y'][1:])
         width = xbr - xtl
         height = ybr - ytl    
         rect = patches.Rectangle((xtl, ytl), width, height, linewidth=2, edgecolor='r', facecolor='none')
