@@ -59,14 +59,18 @@ class Conv(Layer):
             grad_conv -- array of shape (batch_size, height, width, channels), gradient of the loss with respect to the input, the shape is corresponding to forward input            
     '''
 
-    def __init__(self, num_filters, filter_size, channels=1):
+    def __init__(self, num_filters, filter_size, channels=1, momentum=0.9):
         self.num_filters = num_filters
         self.filter_size = filter_size
         self.channels = channels
+        self.momentum = momentum
         # initialization of n filters (kernels) with random values from normal distribution scales down by 10
         self.kernels = np.random.randn(num_filters, filter_size, filter_size, channels) * 0.1
         # number of biases == num_filters, all biases start at 0
         self.biases = np.zeros(num_filters)    
+        # Initialize velocities for momentum
+        self.v_kernels = np.zeros_like(self.kernels)
+        self.v_biases = np.zeros_like(self.biases)
         # print('Convolutional layer initialized.')
 
     def __repr__(self):
@@ -127,6 +131,7 @@ class Conv(Layer):
         Gradient for kernels:
             dl/dk = ?
             dk -- gradient of the cost with respect of the weights of the kernel
+            db -- gradient of the cost with respect of the biases
             z -- values from grad_output
             A -- imput array (from forward)
             a -- values from input array (from forward)
@@ -204,11 +209,41 @@ class Conv(Layer):
                 # dl/db = ∑(dl/dz)
                 grad_biases[k] += np.sum(grad_output_per_kernel)              
 
-        # Update parameters
-        # k = k - learning_rate * dl/dk
-        self.kernels -= learning_rate * grad_kernels                
-        # b = b - learning_rate * dl/db
-        self.biases -= learning_rate * grad_biases
+        # # Update parameters
+        # # k = k - learning_rate * dl/dk
+        # self.kernels -= learning_rate * grad_kernels                
+        # # b = b - learning_rate * dl/db
+        # self.biases -= learning_rate * grad_biases
+
+        '''
+        Parameters update
+        vk -- velocity (kernels)
+        dk -- gradient of the cost with respect of the weights of the kernel
+        db -- gradient of the cost with respect of the biases
+        m -- momentum
+        lr -- learning rate
+        k -- kernels (weights)
+        b -- biases
+
+        Without momentum:
+            k = k - lr * dl/dk
+            b = b - lr * dl/db
+
+        With momentum:
+            vk = m * vk - lr * dl/dk
+            vb = m * vb - lr * dl/db
+
+            k = k + vk
+            b = b + vb
+        '''
+
+        # Velocity updates
+        self.v_kernels = self.momentum * self.v_kernels - learning_rate * grad_kernels
+        self.v_biases = self.momentum * self.v_biases - learning_rate * grad_biases
+
+        # Parameter updates
+        self.kernels += self.v_kernels
+        self.biases += self.v_biases
         return grad_conv
 
 
@@ -413,12 +448,16 @@ class Dense(Layer):
             grad_fc -- array of shape (batch_size, n)   
     '''
 
-    def __init__(self, input_size, output_size):
+    def __init__(self, input_size, output_size, momentum=0.9):
         self.input_size = input_size
         self.output_size = output_size
+        self.momentum = momentum
         self.weights = np.random.randn(input_size, output_size) * 0.1
         self.biases = np.zeros((1, output_size))
         # print(f'Dense layer initialized: input_size={input_size}, output_size={output_size}')
+        # Initialize momentum terms (velocities)
+        self.v_weights = np.zeros_like(self.weights)
+        self.v_biases = np.zeros_like(self.biases)
 
     def __repr__(self):
         return f"Dense(input_size={self.input_size}, output_size={self.output_size})"
@@ -468,9 +507,35 @@ class Dense(Layer):
         # dL/dX
         grad_fc = np.dot(grad_output, self.weights.T)
 
+        '''
+        Parameters update
+        vw -- velocity (weights)
+        dw -- gradient of the cost with respect of the weights
+        db -- gradient of the cost with respect of the biases
+        m -- momentum
+        lr -- learning rate
+        w -- weights
+        b -- biases
+
+        Without momentum:
+            w = w - lr * dl/dw
+            b = b - lr * dl/db
+
+        With momentum:
+            vk = m * vw - lr * dl/dw
+            vb = m * vb - lr * dl/db
+
+            w = w + vw
+            b = b + vb
+        '''
+
+        # Momentum update
+        self.v_weights = self.momentum * self.v_weights - learning_rate * grad_weights
+        self.v_biases = self.momentum * self.v_biases - learning_rate * grad_biases
+
         # Weight and bias update
-        self.weights -= learning_rate * grad_weights
-        self.biases -= learning_rate * grad_biases
+        self.weights += self.v_weights
+        self.biases += self.v_biases
         return grad_fc
 
 

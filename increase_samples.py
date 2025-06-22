@@ -11,6 +11,10 @@ flipped_dir = './data/original/flipped_photos'
 noise_dir = './data/original/noise_photos'
 flipped_noise_dir = './data/original/flipped_noise_photos'
 
+folders = [flipped_dir, noise_dir, flipped_noise_dir]
+for folder in folders:
+    if folder and not os.path.exists(folder):
+        os.mkdir(folder)
 
 def read_plates_csv(csv_path):
     # Load original CSV to pandas dataframe
@@ -31,9 +35,6 @@ def save_flipped_images(image_dir, flipped_dir, csv_path):
         # Load and flip image
         img_path = os.path.join(image_dir, name)
         img = cv2.imread(img_path)
-        if img is None:
-            print(f"Warning: Image {name} not found!")
-            continue
 
         flipped_img = cv2.flip(img, 1)
         flipped_name = f'flip_{name}'
@@ -61,26 +62,26 @@ def save_flipped_images(image_dir, flipped_dir, csv_path):
     # Save flipped data to CSV
     flipped_df = pd.DataFrame(flipped_rows)
     flipped_df.to_csv('./data/original/flipped_plates.csv', index=False)
-    print(f"Flipping complete. CSV saved, total flipped rows: {len(flipped_rows)}")
+    print(f"Flipping complete. CSV saved, total flipped rows: {len(flipped_rows)}.")
 
 
-def add_noise_and_brightness(image_np):
+def add_noise_and_brightness(image):
     # Convert image to float32 and normalize to [0.0, 1.0]
-    image = tf.convert_to_tensor(image_np, dtype=tf.float32) / 255.0
+    noisy_image = tf.convert_to_tensor(image, dtype=tf.float32) / 255.0
 
     # Apply random brightness and contrast
-    image = tf.image.random_brightness(image, max_delta=0.2)
-    image = tf.image.random_contrast(image, lower=0.8, upper=1.2)
+    noisy_image = tf.image.random_brightness(noisy_image, max_delta=0.2)
+    noisy_image = tf.image.random_contrast(noisy_image, lower=0.8, upper=1.2)
 
     # Add Gaussian noise
-    noise = tf.random.normal(shape=tf.shape(image), mean=0.0, stddev=0.05)
-    image = image + noise
+    noise = tf.random.normal(shape=tf.shape(noisy_image), mean=0.0, stddev=0.05)
+    noisy_image = noisy_image + noise
 
-    # Keep values in [0.0, 1.0]
-    image = tf.clip_by_value(image, 0.0, 1.0)
+    # Keep values in range [0.0, 1.0]
+    noisy_image = tf.clip_by_value(noisy_image, 0.0, 1.0)
 
     # Convert back to uint8 format (0–255) for saving with OpenCV
-    return (image * 255).numpy().astype("uint8")
+    return (noisy_image * 255).numpy().astype("uint8")
 
 
 def save_noisy_images(image_dir, noise_dir, csv_path, new_csv_path):
@@ -89,10 +90,6 @@ def save_noisy_images(image_dir, noise_dir, csv_path, new_csv_path):
     for name, xtl, ytl, xbr, ybr, img_width, img_height in read_plates_csv(csv_path):
         image_path = os.path.join(image_dir, name)
         original_image = cv2.imread(image_path)
-
-        if original_image is None:
-            print(f"Warning: Image {name} not found!")
-            continue
 
         # Apply noise and brightness
         noisy_image = add_noise_and_brightness(original_image)
@@ -113,9 +110,9 @@ def save_noisy_images(image_dir, noise_dir, csv_path, new_csv_path):
             'img_height': img_height
         })        
 
-    # Save noised data to CSV
+    # Save noisy data to CSV
     pd.DataFrame(noisy_rows).to_csv(new_csv_path, index=False)
-    print(f"Adding noise and brightnes complete. CSV saved, total flipped rows: {len(noisy_rows)}.")
+    print(f"Adding noise and brightnes complete. CSV saved, total noisy rows: {len(noisy_rows)}.")
 
 
 save_flipped_images(image_dir, flipped_dir, csv_path)

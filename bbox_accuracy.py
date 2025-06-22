@@ -1,8 +1,9 @@
 import numpy as np
 import tensorflow as tf
+from data_preparation import rescale_bbox
 
 
-def intersection_over_union(rescaled_bboxs_predicted, rescaled_bbox_original):
+def intersection_over_union(rescaled_bbox_original, rescaled_bboxs_predicted):
     '''
     IoU - Intersection over Union, measure the overlap between two bounding boxes.
 
@@ -13,8 +14,8 @@ def intersection_over_union(rescaled_bboxs_predicted, rescaled_bbox_original):
         iou -- the accuracy of predicted bounding boxes against ground truth bounding boxes, 0 - poor accuracy, 1 - perfect accuracy
     '''
 
-    pred = np.array(rescaled_bboxs_predicted)
     true = np.array(rescaled_bbox_original)
+    pred = np.array(rescaled_bboxs_predicted)
 
     # Find cross-overs coordinates, (xA, yA) - top left point of intersection, (xB, yB) - bottom right point of intersection
     xA = np.amax([pred[:, 0], true[:, 0]], axis=0)
@@ -29,14 +30,10 @@ def intersection_over_union(rescaled_bboxs_predicted, rescaled_bbox_original):
 
     # Area of intersection
     inter_area = inter_width * inter_height
-    # end if intersection doesn't exis
-    # if inter_area == 0:
-    #     iou = 0.0
-    #     continue
 
-    # Area of predicted bbox and original bbox
-    pred_area = (pred[:, 2] - pred[:, 0]) * (pred[:, 3] - pred[:, 1])
+    # Area of predicted bbox and true (original) bbox
     true_area = (true[:, 2] - true[:, 0]) * (true[:, 3] - true[:, 1])
+    pred_area = (pred[:, 2] - pred[:, 0]) * (pred[:, 3] - pred[:, 1])
 
     # IoU = intersection_area / union_area   =>   IoU = intersection_area / (predicted_area + original_area - intersection_area)
     iou = inter_area / (pred_area + true_area - inter_area)
@@ -45,21 +42,23 @@ def intersection_over_union(rescaled_bboxs_predicted, rescaled_bbox_original):
 
 
 '''
-For Tensorflow model
+For Keras model, the IoU is counted for not rescaled bboxes
 '''
 def mean_iou(y_true, y_pred):
-    # x_min, y_min, x_max, y_max for both
-    x1 = tf.maximum(y_true[:, 0], y_pred[:, 0])
-    y1 = tf.maximum(y_true[:, 1], y_pred[:, 1])
-    x2 = tf.minimum(y_true[:, 2], y_pred[:, 2])
-    y2 = tf.minimum(y_true[:, 3], y_pred[:, 3])
+    # Cross-overs coordinates, (xA, yA) - top left point of intersection, (xB, yB) - bottom right point of intersection
+    xA = tf.maximum(y_true[:, 0], y_pred[:, 0])
+    yA = tf.maximum(y_true[:, 1], y_pred[:, 1])
+    xB = tf.minimum(y_true[:, 2], y_pred[:, 2])
+    yB = tf.minimum(y_true[:, 3], y_pred[:, 3])
 
-    intersection = tf.maximum(0.0, x2 - x1) * tf.maximum(0.0, y2 - y1)
+    # Area of intersection
+    inter_area = tf.maximum(0.0, xB - xA) * tf.maximum(0.0, yB - yA)
 
-    area_true = (y_true[:, 2] - y_true[:, 0]) * (y_true[:, 3] - y_true[:, 1])
-    area_pred = (y_pred[:, 2] - y_pred[:, 0]) * (y_pred[:, 3] - y_pred[:, 1])
+    # Area of predicted bbox and true (original) bbox
+    true_area = (y_true[:, 2] - y_true[:, 0]) * (y_true[:, 3] - y_true[:, 1])
+    pred_area = (y_pred[:, 2] - y_pred[:, 0]) * (y_pred[:, 3] - y_pred[:, 1])
 
-    union = area_true + area_pred - intersection
-    iou = tf.math.divide_no_nan(intersection, union)
+    # IoU = intersection_area / (predicted_area + original_area - intersection_area)
+    iou = inter_area / (true_area + pred_area - inter_area)
 
     return tf.reduce_mean(iou)

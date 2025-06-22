@@ -1,4 +1,5 @@
 /data
+/saved_models
 custom_model_parameters.npz
 
 # Byte-compiled / optimized / DLL files

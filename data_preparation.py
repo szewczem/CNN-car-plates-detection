@@ -229,33 +229,36 @@ def output_array_tolist(predicted_array):
     return predicted_values
 
 
-# def rescale_bbox(predicted_values, true_size):
-#     pred = np.array(predicted_values)
-#     true = np.array(true_size)
-
-#     xtl = [pred[:, 0] * true[:, 0]]
-#     ytl = [pred[:, 1] * true[:, 1]]
-#     xbr = [pred[:, 2] * true[:, 0]]
-#     ybr = [pred[:, 3] * true[:, 1]]
-
-#     rescaled_bboxs = np.stack([xtl, ytl, xbr, ybr], axis=1)
-#     return rescaled_bboxs
-
-
 def rescale_bbox(predicted_values, true_size):
-    rescaled_bboxs = []
-    for bbox, size in zip(predicted_values, true_size):
-        xtl_n, ytl_n, xbr_n, ybr_n = bbox
-        img_width, img_height = size
+    pred = np.array(predicted_values)
+    true = np.array(true_size)
 
-        # Rescale back to original image size
-        xtl = xtl_n * img_width
-        ytl = ytl_n * img_height
-        xbr = xbr_n * img_width
-        ybr = ybr_n * img_height
+    img_width = true[:, 0]
+    img_height = true[:, 1]
 
-        rescaled_bboxs.append([float(xtl), float(ytl), float(xbr), float(ybr)])
+    xtl = pred[:, 0] * img_width
+    ytl = pred[:, 1] * img_height
+    xbr = pred[:, 2] * img_width
+    ybr = pred[:, 3] * img_height
+
+    rescaled_bboxs = np.stack([xtl, ytl, xbr, ybr], axis=1)
     return rescaled_bboxs
+
+
+# def rescale_bbox(predicted_values, true_size):
+#     rescaled_bboxs = []
+#     for bbox, size in zip(predicted_values, true_size):
+#         xtl_n, ytl_n, xbr_n, ybr_n = bbox
+#         img_width, img_height = size
+
+#         # Rescale back to original image size
+#         xtl = xtl_n * img_width
+#         ytl = ytl_n * img_height
+#         xbr = xbr_n * img_width
+#         ybr = ybr_n * img_height
+
+#         rescaled_bboxs.append([float(xtl), float(ytl), float(xbr), float(ybr)])
+#     return rescaled_bboxs
 
 
 # PLOTS
