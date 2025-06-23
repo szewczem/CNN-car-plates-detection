@@ -42,11 +42,11 @@ def build_keras_model(img_height, img_width, learning_rate, min_delta, patience,
 
     keras_cnn_model.add(Flatten())
 
-    keras_cnn_model.add(Dense(8, use_bias=True, kernel_initializer=tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.1),
+    keras_cnn_model.add(Dense(8, use_bias=True, kernel_initializer=RandomNormal(mean=0.0, stddev=0.1),
     bias_initializer='zeros'))
-    keras_cnn_model.add(Dense(8, use_bias=True, kernel_initializer=tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.1),
+    keras_cnn_model.add(Dense(8, use_bias=True, kernel_initializer=RandomNormal(mean=0.0, stddev=0.1),
     bias_initializer='zeros'))
-    keras_cnn_model.add(Dense(4, use_bias=True, kernel_initializer=tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.1),
+    keras_cnn_model.add(Dense(4, use_bias=True, kernel_initializer=RandomNormal(mean=0.0, stddev=0.1),
     bias_initializer='zeros'))
     
     # Gradient descent (with momentum) optimizer
