@@ -7,6 +7,7 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from PIL import Image
+from increase_samples import processed_dir
 
 
 # ==================== LOADING DATA FROM XML TO CSV ====================
@@ -179,39 +180,39 @@ def save_prepared_data(sources, new_width, new_height):
 
     # Save prepared stets
     # training set
-    np.save('./data/processed/X_train.npy', X_train)
-    np.save('./data/processed/Y_train.npy', Y_train)
-    np.save('./data/processed/true_size_train.npy', true_size_train)
-    np.save('./data/processed/filename_train.npy', filename_train)
+    np.save(processed_dir + '/X_train.npy', X_train)
+    np.save(processed_dir + '/Y_train.npy', Y_train)
+    np.save(processed_dir + '/true_size_train.npy', true_size_train)
+    np.save(processed_dir + '/filename_train.npy', filename_train)
 
     # test set
-    np.save('./data/processed/X_test.npy', X_test)
-    np.save('./data/processed/Y_test.npy', Y_test)
-    np.save('./data/processed/true_size_test.npy', true_size_test)
-    np.save('./data/processed/filename_test.npy', filename_test)
+    np.save(processed_dir + '/X_test.npy', X_test)
+    np.save(processed_dir + '/Y_test.npy', Y_test)
+    np.save(processed_dir + '/true_size_test.npy', true_size_test)
+    np.save(processed_dir + '/filename_test.npy', filename_test)
 
     # validation set
-    np.save('./data/processed/X_val.npy', X_val)
-    np.save('./data/processed/Y_val.npy', Y_val)
-    np.save('./data/processed/true_size_val.npy', true_size_val)
-    np.save('./data/processed/filename_val.npy', filename_val)
+    np.save(processed_dir + '/X_val.npy', X_val)
+    np.save(processed_dir + '/Y_val.npy', Y_val)
+    np.save(processed_dir + '/true_size_val.npy', true_size_val)
+    np.save(processed_dir + '/filename_val.npy', filename_val)
 
     print("Data preparation and saving complete.")
 
 
 def load_prepared_data():
-    X_train = np.load('./data/processed/X_train.npy')
-    Y_train = np.load('./data/processed/Y_train.npy')
-    X_test = np.load('./data/processed/X_test.npy')
-    Y_test = np.load('./data/processed/Y_test.npy')
-    X_val = np.load('./data/processed/X_val.npy')
-    Y_val = np.load('./data/processed/Y_val.npy')
-    true_size_train = np.load('./data/processed/true_size_train.npy')
-    true_size_test = np.load('./data/processed/true_size_test.npy')
-    true_size_val = np.load('./data/processed/true_size_val.npy')
-    filename_train = np.load('./data/processed/filename_train.npy')
-    filename_test = np.load('./data/processed/filename_test.npy')
-    filename_val = np.load('./data/processed/filename_val.npy')
+    X_train = np.load(processed_dir + '/X_train.npy')
+    Y_train = np.load(processed_dir + '/Y_train.npy')
+    X_test = np.load(processed_dir + '/X_test.npy')
+    Y_test = np.load(processed_dir + '/Y_test.npy')
+    X_val = np.load(processed_dir + '/X_val.npy')
+    Y_val = np.load(processed_dir + '/Y_val.npy')
+    true_size_train = np.load(processed_dir + '/true_size_train.npy')
+    true_size_test = np.load(processed_dir + '/true_size_test.npy')
+    true_size_val = np.load(processed_dir + '/true_size_val.npy')
+    filename_train = np.load(processed_dir + '/filename_train.npy')
+    filename_test = np.load(processed_dir + '/filename_test.npy')
+    filename_val = np.load(processed_dir + '/filename_val.npy')
     print("Data loaded.")
     return X_train, Y_train, X_test, Y_test, X_val, Y_val, true_size_train, true_size_test, true_size_val, filename_train, filename_test, filename_val
 
@@ -261,8 +262,8 @@ def rescale_bbox(predicted_values, true_size):
 #     return rescaled_bboxs
 
 
-# PLOTS
-def plot_images_with_bounding_boxes(all_data):
+# plot for colorful images and images in grayscale, width and height is necessary for preprocesed images (in grayscale)
+def plot_images_with_bounding_boxes(all_data, new_width=None, new_height=None):
     fig, axes = plt.subplots(nrows=4, ncols=3, figsize=(18, 12))
     axes = axes.flatten()
     num_examples = len(all_data)
@@ -271,21 +272,37 @@ def plot_images_with_bounding_boxes(all_data):
         example = all_data[idx]
 
         # Showing image, the point (0,0) is placed at the top-left corner
-        img = Image.open(example['X'])
-        ax.imshow(img)
+        if isinstance(example['X'], str):
+            img = Image.open(example['X'])
+            ax.imshow(img)
+        else:
+            img = example['X']
+            ax.imshow(example['X'], cmap='gray')
         
         # Red bounding box
-        xtl, ytl, xbr, ybr, img_width, img_height = map(float, example['Y'][1:])
-        width = xbr - xtl
-        height = ybr - ytl    
-        rect = patches.Rectangle((xtl, ytl), width, height, linewidth=2, edgecolor='r', facecolor='none')
+        if len(example['Y']) > 4:
+            xtl, ytl, xbr, ybr, img_width, img_height = map(float, example['Y'][1:])
+            width = xbr - xtl
+            height = ybr - ytl    
+            rect = patches.Rectangle((xtl, ytl), width, height, linewidth=2, edgecolor='r', facecolor='none')
+        else:
+            xtl, ytl, xbr, ybr = map(float, example['Y'])
+            xtl = xtl * new_width
+            ytl = ytl * new_height
+            xbr = xbr * new_width
+            ybr = ybr * new_height    
+            width = xbr - xtl
+            height = ybr - ytl
+            rect = patches.Rectangle((xtl, ytl), width, height, linewidth=2, edgecolor='r', facecolor='none')
         
         # Add rectangle to axis
         ax.add_patch(rect)
         
         # Set title (image filename)
-        ax.set_title(example['X'].split('/')[-1])
+        if isinstance(example['X'], str):
+            ax.set_title(example['X'].split('/')[-1])
+        else:
+            ax.set_title("Preprocessed Image")
         ax.axis('off')
     plt.tight_layout()
     plt.show()
-

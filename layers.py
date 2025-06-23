@@ -569,7 +569,7 @@ class MSELoss(Layer):
 
     def backward(self):
         # Gradient of the loss, batch size = 2^n
-        # dl/dy_pred = 2/n * (y_pred- y), where n - total number of elements (batch * bbox)
+        # dl/dy_pred = 2/n * (y_pred - y), where n - total number of elements (batch * bbox)
         n = self.y_original.size
         grad = (2 / n) * (self.y_predicted - self.y_original)
         return grad

@@ -5,16 +5,25 @@ import cv2
 import os
 
 
+# Original paths
 csv_path = './data/original/plates.csv'
 image_dir = './data/original/photos'
+
+# Paths for new data
 flipped_dir = './data/original/flipped_photos'
 noise_dir = './data/original/noise_photos'
 flipped_noise_dir = './data/original/flipped_noise_photos'
+processed_dir = './data/processed'
 
-folders = [flipped_dir, noise_dir, flipped_noise_dir]
-for folder in folders:
-    if folder and not os.path.exists(folder):
-        os.mkdir(folder)
+# List of new paths
+folders = [flipped_dir, noise_dir, flipped_noise_dir, processed_dir]
+
+
+def create_folders(folders):
+    for folder in folders:
+        if folder and not os.path.exists(folder):
+            os.mkdir(folder)
+
 
 def read_plates_csv(csv_path):
     # Load original CSV to pandas dataframe
@@ -28,8 +37,7 @@ def read_plates_csv(csv_path):
         yield name, xtl, ytl, xbr, ybr, img_width, img_height
 
 
-def save_flipped_images(image_dir, flipped_dir, csv_path):    
-    os.makedirs(flipped_dir, exist_ok=True) 
+def save_flipped_images(image_dir, flipped_dir, csv_path):
     flipped_rows = []
     for name, xtl, ytl, xbr, ybr, img_width, img_height in read_plates_csv(csv_path):
         # Load and flip image
@@ -85,7 +93,6 @@ def add_noise_and_brightness(image):
 
 
 def save_noisy_images(image_dir, noise_dir, csv_path, new_csv_path):
-    os.makedirs(noise_dir, exist_ok=True)
     noisy_rows = []
     for name, xtl, ytl, xbr, ybr, img_width, img_height in read_plates_csv(csv_path):
         image_path = os.path.join(image_dir, name)
@@ -115,6 +122,12 @@ def save_noisy_images(image_dir, noise_dir, csv_path, new_csv_path):
     print(f"Adding noise and brightnes complete. CSV saved, total noisy rows: {len(noisy_rows)}.")
 
 
-save_flipped_images(image_dir, flipped_dir, csv_path)
-save_noisy_images(image_dir, noise_dir, csv_path, './data/original/noise_plates.csv')
-save_noisy_images(flipped_dir, flipped_noise_dir, './data/original/flipped_plates.csv', './data/original/flipped_noise_plates.csv')
+def main():
+    create_folders(folders)
+    save_flipped_images(image_dir, flipped_dir, csv_path)
+    save_noisy_images(image_dir, noise_dir, csv_path, './data/original/noise_plates.csv')
+    save_noisy_images(flipped_dir, flipped_noise_dir, './data/original/flipped_plates.csv', './data/original/flipped_noise_plates.csv')
+
+
+if __name__ == "__main__":
+    main()

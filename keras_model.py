@@ -1,6 +1,6 @@
 import tensorflow as tf
 from keras.models import Sequential
-from keras.layers import Input, Dense, Conv2D, MaxPooling2D, Flatten, Dropout, BatchNormalization
+from keras.layers import Input, Dense, Conv2D, MaxPooling2D, Flatten, Dropout
 from keras.initializers import RandomNormal
 from keras.optimizers import SGD
 from bbox_accuracy import mean_iou
