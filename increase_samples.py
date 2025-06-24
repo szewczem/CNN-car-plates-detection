@@ -1,11 +1,14 @@
+from xml.dom.minidom import parse
 import tensorflow as tf
 import numpy as np
 import pandas as pd
 import cv2
 import os
+import csv
 
 
-# Original paths
+# Paths: existing .xml file and images dir, new .csv file
+xml_path = './data/original/annotations.xml'
 csv_path = './data/original/plates.csv'
 image_dir = './data/original/photos'
 
@@ -19,10 +22,34 @@ processed_dir = './data/processed'
 folders = [flipped_dir, noise_dir, flipped_noise_dir, processed_dir]
 
 
+# ==================== DATA AUGMENTATION ====================
 def create_folders(folders):
     for folder in folders:
         if folder and not os.path.exists(folder):
             os.mkdir(folder)
+
+
+# Write the plates location from .xml to .csv ('name', 'x_top_left', 'y_top_left', 'x_bottom_right', 'y_bottom_right')
+def write_to_csv(xml_path, csv_path):
+    dom = parse(xml_path)
+    images = dom.getElementsByTagName('image')
+    
+    csvfile = open(csv_path, 'w', newline='')
+    fieldnames = ['name', 'xtl', 'ytl', 'xbr', 'ybr', 'img_width', 'img_height']
+    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    writer.writeheader()
+
+    for image in images:
+        # Getg value from xml file
+        name = image.getAttribute('name')
+        xtl = float(image.getElementsByTagName('box')[0].getAttribute('xtl'))
+        ytl = float(image.getElementsByTagName('box')[0].getAttribute('ytl'))
+        xbr = float(image.getElementsByTagName('box')[0].getAttribute('xbr'))
+        ybr = float(image.getElementsByTagName('box')[0].getAttribute('ybr'))
+        img_width = float(image.getAttribute('width'))
+        img_height = float(image.getAttribute('height'))
+
+        writer.writerow({'name': name, 'xtl': xtl, 'ytl': ytl, 'xbr': xbr, 'ybr': ybr, 'img_width': img_width, 'img_height': img_height})
 
 
 def read_plates_csv(csv_path):
@@ -122,7 +149,9 @@ def save_noisy_images(image_dir, noise_dir, csv_path, new_csv_path):
     print(f"Adding noise and brightnes complete. CSV saved, total noisy rows: {len(noisy_rows)}.")
 
 
+# ==================== EXECUTABLE ====================
 def main():
+    write_to_csv(xml_path, csv_path)
     create_folders(folders)
     save_flipped_images(image_dir, flipped_dir, csv_path)
     save_noisy_images(image_dir, noise_dir, csv_path, './data/original/noise_plates.csv')

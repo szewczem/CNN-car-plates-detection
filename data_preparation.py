@@ -3,32 +3,11 @@ import csv
 import os
 import random
 import numpy as np
-import cv2 as cv
+import cv2
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from PIL import Image
 from increase_samples import processed_dir
-
-
-# ==================== LOADING DATA FROM XML TO CSV ====================
-# writing the plates location from .xml to .csv ('name', 'x_top_left', 'y_top_left', 'x_bottom_right', 'y_bottom_right')
-def write_to_csv(plates):
-    csvfile = open('./data/original/plates.csv', 'w', newline='')
-    fieldnames = ['name', 'xtl', 'ytl', 'xbr', 'ybr', 'img_width', 'img_height']
-    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-    writer.writeheader()
-
-    for plate in plates:
-        # getting value from xml file
-        name = plate.getAttribute('name')
-        xtl = float(plate.getElementsByTagName('box')[0].getAttribute('xtl'))
-        ytl = float(plate.getElementsByTagName('box')[0].getAttribute('ytl'))
-        xbr = float(plate.getElementsByTagName('box')[0].getAttribute('xbr'))
-        ybr = float(plate.getElementsByTagName('box')[0].getAttribute('ybr'))
-        img_width = float(plate.getAttribute('width'))
-        img_height = float(plate.getAttribute('height'))
-
-        writer.writerow({'name': name, 'xtl': xtl, 'ytl': ytl, 'xbr': xbr, 'ybr': ybr, 'img_width': img_width, 'img_height': img_height})
 
 
 # ==================== LOADING DATA FROM CSV ====================
@@ -74,8 +53,8 @@ def img_set_size(all_data, new_width, new_height):
             print(f'processing {numer_of_part}/{parts}')
 
         # Load and resize image
-        img = cv.imread(example['X'])
-        resized_img = cv.resize(img, (new_width, new_height))
+        img = cv2.imread(example['X'])
+        resized_img = cv2.resize(img, (new_width, new_height))
 
         # Get filename
         name = example['Y'][0]
@@ -98,7 +77,7 @@ def data_list_processed(all_data_resized):
     all_data_processed = []
 
     for img in all_data_resized:
-        img_gray = cv.cvtColor(img['X'], cv.COLOR_BGR2GRAY)
+        img_gray = cv2.cvtColor(img['X'], cv2.COLOR_BGR2GRAY)
         all_data_processed.append({"X": img_gray, "Y": img['Y'], "true_size_size": img['true_size_size'], 'filename': img['filename']})
 
     # Shuffle the resized and converted to grayscale data list    
@@ -160,6 +139,7 @@ def data_split(X, Y, true_size_size, filename):
     return X_train, Y_train, X_test, Y_test, X_val, Y_val, true_size_train, true_size_test, true_size_val, filename_train, filename_test, filename_val
 
 
+# ==================== LOADING AND SAVING PREPARED DATA ====================
 def save_prepared_data(sources, new_width, new_height):
     print("Starting data preprocesing...")
 
@@ -225,6 +205,7 @@ def load_data(sources, img_width, img_height):
         return load_prepared_data()
 
 
+# ==================== UTILS ====================
 def output_array_tolist(predicted_array):
     predicted_values = predicted_array.flatten().tolist()
     return predicted_values
@@ -246,22 +227,7 @@ def rescale_bbox(predicted_values, true_size):
     return rescaled_bboxs
 
 
-# def rescale_bbox(predicted_values, true_size):
-#     rescaled_bboxs = []
-#     for bbox, size in zip(predicted_values, true_size):
-#         xtl_n, ytl_n, xbr_n, ybr_n = bbox
-#         img_width, img_height = size
-
-#         # Rescale back to original image size
-#         xtl = xtl_n * img_width
-#         ytl = ytl_n * img_height
-#         xbr = xbr_n * img_width
-#         ybr = ybr_n * img_height
-
-#         rescaled_bboxs.append([float(xtl), float(ytl), float(xbr), float(ybr)])
-#     return rescaled_bboxs
-
-
+# ==================== PLOTS ====================
 # plot for colorful images and images in grayscale, width and height is necessary for preprocesed images (in grayscale)
 def plot_images_with_bounding_boxes(all_data, new_width=None, new_height=None):
     fig, axes = plt.subplots(nrows=4, ncols=3, figsize=(18, 12))

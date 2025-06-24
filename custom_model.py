@@ -2,7 +2,7 @@ from layers import Conv, ReLU, MaxPool, Flatten, Dense, MSELoss
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from bbox_accuracy import intersection_over_union
+from bbox_accuracy import mean_iou
 from data_preparation import rescale_bbox
 import time
 import progressbar
@@ -174,8 +174,7 @@ class CNN:
             rescaled_bboxs_original = rescale_bbox(Y, true_size_train)
             
             # Accuracy per epoch
-            iou = intersection_over_union(rescaled_bboxs_predicted, rescaled_bboxs_original)
-            avg_iou = np.mean(iou)
+            avg_iou = mean_iou(rescaled_bboxs_predicted, rescaled_bboxs_original)
             accuracy_per_epoch_train.append(avg_iou)
             
             # ========== VALIDATION ==========
@@ -208,8 +207,7 @@ class CNN:
             rescaled_val_true = rescale_bbox(Y_val, true_size_val)
 
             # Accuracy
-            val_iou = intersection_over_union(rescaled_val_pred, rescaled_val_true)
-            val_avg_iou = np.mean(val_iou)
+            val_avg_iou = mean_iou(rescaled_val_pred, rescaled_val_true)
             accuracy_per_epoch_val.append(val_avg_iou)
 
             # Time per epoch
@@ -219,6 +217,7 @@ class CNN:
             if val_avg_iou > best_val_iou + min_delta:
                 best_val_iou = val_avg_iou
                 noimprovement = 0
+                # Save parameters with the best mean_iou
                 self.save_parameters(filename)
 
                 # bbox predictions
@@ -276,8 +275,7 @@ class CNN:
         rescaled_bboxs_test_true = rescale_bbox(Y_test, true_size_test)
 
         # Accuracy
-        test_iou = intersection_over_union(rescaled_bboxs_test_pred, rescaled_bboxs_test_true)
-        test_avg_iou = np.mean(test_iou)
+        test_avg_iou = mean_iou(rescaled_bboxs_test_pred, rescaled_bboxs_test_true)
 
         # Testing time
         test_duration = time.time() - test_start_time
@@ -373,6 +371,7 @@ class CNN:
             source_dirs -- list of folders to search for the images
             set -- str added to the end of plot title
         """
+        
         # 12 or less if not enough provided
         num_samples = min(12, len(filenames))
         # Select random num_samples idx from all avaible
@@ -392,7 +391,6 @@ class CNN:
                     img_path = try_path
                     break
 
-            # Load and prepare image
             # Load and prepare image
             img = cv2.imread(img_path)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)

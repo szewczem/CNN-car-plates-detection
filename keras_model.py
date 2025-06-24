@@ -3,7 +3,7 @@ from keras.models import Sequential
 from keras.layers import Input, Dense, Conv2D, MaxPooling2D, Flatten, Dropout
 from keras.initializers import RandomNormal
 from keras.optimizers import SGD
-from bbox_accuracy import mean_iou
+from bbox_accuracy import mean_iou_keras
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 
 
@@ -53,13 +53,13 @@ def build_keras_model(img_height, img_width, learning_rate, min_delta, patience,
     optimizer = SGD(learning_rate=learning_rate, momentum=0.9)
 
     # Configures the model for training, loss = MSE, metrics = IoU accuracy
-    keras_cnn_model.compile(optimizer=optimizer, loss='mean_squared_error', metrics=[mean_iou])
+    keras_cnn_model.compile(optimizer=optimizer, loss='mean_squared_error', metrics=[mean_iou_keras])
 
-    # Callback to save the Keras model, selected epoch with max val_mean_iou
-    checkpoint = ModelCheckpoint(filename, monitor='val_mean_iou', mode='max', save_best_only=True)
+    # Callback to save the Keras model, selected epoch with max val_mean_iou_keras
+    checkpoint = ModelCheckpoint(filename, monitor='val_mean_iou_keras', mode='max', save_best_only=True)
 
-    # Stop training when a monitored metric has stopped improving, monitored metric is val_mean_iou
-    early_stop = EarlyStopping(monitor='val_mean_iou', mode='max', min_delta=min_delta, patience=patience, restore_best_weights=True, verbose=1)
+    # Stop training when a monitored metric has stopped improving, monitored metric is val_mean_iou_keras
+    early_stop = EarlyStopping(monitor='val_mean_iou_keras', mode='max', min_delta=min_delta, patience=patience, restore_best_weights=True, verbose=1)
 
     # Print summary of model
     keras_cnn_model.summary()
