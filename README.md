@@ -32,6 +32,8 @@ Hyperparameter tuning was conducted on the Keras model, with the resulting param
 - Model save/load capability
 - Custom training, validation, and testing implementation
 - Hyperparameters tuning for Keras model (grid search)
+- Saving checkpoint corresponding to the epoch that achieved the best mean IoU (highest accuracy)
+- Early stopping to prevent overfitting and unnecessary training
 
 ## Dataset
 
