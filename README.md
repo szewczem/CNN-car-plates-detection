@@ -147,7 +147,7 @@ The **custom model**, where layers are implemented using basic NumPy operations,
 ## Hyperparameter Tuning
 
 The `hyperparameters_tuning.py` script performs a grid search to evaluate different training configurations. By default, it searches over:
-- `learning-rate`
+- `learning_rate`
 - `batch_size`
 - `dense_layer_config` (number and size of Dense layers)
 
