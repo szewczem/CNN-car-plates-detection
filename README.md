@@ -61,9 +61,9 @@ You can customize layer structure using the `custom_model.py` API.
 ## Installation
 
 1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/car-plates-detection.git
-cd car-plates-detection
+```
+git clone https://github.com/szewczem/CNN-car-plates-detection
+cd CNN-car-plates-detection
 ```
 
 2. Create and activate the Conda environment:
